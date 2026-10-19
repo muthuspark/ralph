@@ -47,7 +47,7 @@ function preview(entry) { const d = body(entry); return d.command || d.error || 
 function updateRuns() {
   const runs = [...new Set(data.entries.map(entry => entry.run))].reverse();
   const current = $('run').value;
-  const desired = selectedLatest ? runs[0] || '' : current;
+  const desired = selectedLatest ? (data.entries.at(-1) || {}).run || '' : current;
   if (JSON.stringify(runs) !== $('run').dataset.runs) {
     $('run').replaceChildren(new Option('All runs', ''), ...runs.map(run => new Option(run, run)));
     $('run').dataset.runs = JSON.stringify(runs);

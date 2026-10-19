@@ -75,6 +75,7 @@ ralph --resume <run-id>
 --agent-sandbox MODE           phase-default (default) or explicit danger-full-access; Claude uses scoped tool permissions unless explicitly bypassed
 --resume RUN-ID                Resume saved options and goal
 --retry-verification           With --resume: recheck current edits, keeping the repair count
+--version                      Print the installed package version and exit
 
 Runs in the current Git repository; requires a clean tree on first start.
 Creates a local ralph/<run-id> branch. Add .ralph/ to the project's .gitignore.

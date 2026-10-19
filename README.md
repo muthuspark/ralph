@@ -17,6 +17,7 @@ attempts, or interruptions stop the run with changes preserved for resuming.
 ```sh
 npm install --global @muthuspark/ralph
 ralph --help
+ralph --version
 ```
 
 To build and install from a local checkout, use the steps below.

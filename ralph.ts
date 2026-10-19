@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { closeSync, openSync } from "node:fs";
+import { closeSync, openSync, writeSync } from "node:fs";
 import { hostname } from "node:os";
 import { mkdir, readFile, writeFile, appendFile, rename, unlink, lstat, readlink } from "node:fs/promises";
 import path from "node:path";
@@ -43,7 +43,7 @@ type Candidate = z.infer<typeof candidateSchema>;
 const phases = ["baseline", "discover", "implement", "verify", "browser-prepare", "browser-run", "review", "repair", "commit", "done"] as const;
 const stateSchema = z.object({
   version: z.literal(1), id: text, root: text, branch: text, head: text, fingerprint: text,
-  goal: text, model: z.string(), iterations: z.number().int().nonnegative(),
+  goal: text, model: z.string(), agent: z.enum(["codex", "claude"]).default("codex"), iterations: z.number().int().nonnegative(),
   maxFixAttempts: z.number().int().nonnegative(), timeoutMinutes: z.number().positive(),
   completed: z.number().int().nonnegative(), phase: z.enum(phases), repairs: z.number().int().nonnegative(),
   candidate: candidateSchema.nullable(), feedback: z.array(z.string()),
@@ -55,7 +55,7 @@ const stateSchema = z.object({
 }).strict();
 type State = z.infer<typeof stateSchema>;
 export type Options = {
-  goal?: string; goalFile?: string; resume?: string; model?: string;
+  goal?: string; goalFile?: string; resume?: string; model?: string; agent?: "codex" | "claude";
   iterations: number; maxFixAttempts: number; timeoutMinutes: number;
   baseUrl?: string; retryVerification?: boolean;
   agentSandbox?: "phase-default" | "danger-full-access";
@@ -67,11 +67,12 @@ ralph --goal-file loop-prd.md --iterations 10
 ralph --resume <run-id>
 
 --iterations N                 Verified commits per run (default 10; 0 = unlimited)
---model MODEL                  Override the configured Codex model
+--model MODEL                  Override the selected CLI's model
+--agent AGENT                  Agent CLI: codex (default) or claude
 --max-fix-attempts N            Repair rounds per iteration (default 3)
 --phase-timeout-minutes N       Timeout per agent/check command (default 30)
 --base-url URL                 Existing app server (default http://localhost:3000)
---agent-sandbox MODE           phase-default (default) or explicit danger-full-access
+--agent-sandbox MODE           phase-default (default) or explicit danger-full-access; Claude uses scoped tool permissions unless explicitly bypassed
 --resume RUN-ID                Resume saved options and goal
 --retry-verification           With --resume: recheck current edits, keeping the repair count
 
@@ -100,6 +101,7 @@ export function parseOptions(args: string[]): Options {
       case "--goal-file": options.goalFile = value; break;
       case "--resume": options.resume = value; break;
       case "--model": options.model = value; break;
+      case "--agent": options.agent = z.enum(["codex", "claude"]).parse(value); break;
       case "--agent-sandbox":
         options.agentSandbox = z.enum(["phase-default", "danger-full-access"]).parse(value);
         break;
@@ -119,7 +121,7 @@ export function parseOptions(args: string[]): Options {
     }
   }
   if (options.resume) {
-    if (!/^[a-zA-Z0-9_-]+$/.test(options.resume) || [...seen].some(flag => !["--resume", "--base-url", "--retry-verification", "--agent-sandbox"].includes(flag))) throw new Error("Use --resume RUN-ID alone or with --base-url, --agent-sandbox, and --retry-verification");
+    if (!/^[a-zA-Z0-9_-]+$/.test(options.resume) || [...seen].some(flag => !["--resume", "--base-url", "--retry-verification", "--agent-sandbox", "--agent"].includes(flag))) throw new Error("Use --resume RUN-ID alone or with --base-url, --agent, --agent-sandbox, and --retry-verification");
   } else if (options.retryVerification) {
     throw new Error("--retry-verification requires --resume");
   } else if (Boolean(options.goal) === Boolean(options.goalFile)) {
@@ -147,12 +149,13 @@ Also score impact, confidence, effort, and risk from 1 to 5; higher effort/risk 
 // Spawn argument arrays directly: goal text and model output never become shell code.
 async function command(bin: string, args: string[], cwd: string, options: {
   input?: string; log?: string; timeoutMs?: number; signal?: AbortSignal; env?: Record<string, string>;
+  captureStdout?: boolean;
 } = {}) {
   options.signal?.throwIfAborted();
   const fd = options.log ? openSync(options.log, "a") : undefined;
   try {
     return await new Promise<string>((resolve, reject) => {
-      const child = spawn(bin, args, { cwd, env: { ...process.env, ...options.env }, detached: process.platform !== "win32", stdio: ["pipe", fd ?? "pipe", fd ?? "pipe"] });
+      const child = spawn(bin, args, { cwd, env: { ...process.env, ...options.env }, detached: process.platform !== "win32", stdio: ["pipe", options.captureStdout ? "pipe" : fd ?? "pipe", fd ?? "pipe"] });
       let output = "", failure: Error | undefined;
       let killTimer: ReturnType<typeof setTimeout> | undefined;
       const kill = (signal: NodeJS.Signals) => {
@@ -175,7 +178,10 @@ async function command(bin: string, args: string[], cwd: string, options: {
         if (killTimer) clearTimeout(killTimer);
         options.signal?.removeEventListener("abort", abort);
       };
-      child.stdout?.on("data", chunk => { output += chunk.toString(); });
+      child.stdout?.on("data", chunk => {
+        output += chunk.toString();
+        if (options.captureStdout && fd !== undefined) writeSync(fd, chunk);
+      });
       child.stderr?.on("data", chunk => { output += chunk.toString(); });
       child.stdin?.on("error", () => { /* early child exit is reported below */ });
       child.on("error", error => { cleanup(); reject(error); });
@@ -259,11 +265,11 @@ export async function runRalph(options: Options, cwd = process.cwd(), signal?: A
     await atomicJson(path.join(dir, "state.json"), state);
   };
   try {
-    await command("codex", ["--version"], root, { signal });
     if (options.resume) {
       dir = path.join(root, ".ralph", options.resume);
       state = stateSchema.parse(JSON.parse(await readFile(path.join(dir, "state.json"), "utf8")));
       if (state.root !== root || state.id !== options.resume) throw new Error("Saved run belongs to a different repository");
+      await command(options.agent ?? state.agent, ["--version"], root, { signal });
       if (await git(root, "branch", "--show-current") !== state.branch) throw new Error(`Switch to ${state.branch} before resuming`);
       const head = await git(root, "rev-parse", "HEAD");
       // Recover a commit made just before a crash prevented the state update.
@@ -288,8 +294,10 @@ export async function runRalph(options: Options, cwd = process.cwd(), signal?: A
         if (state.phase === "review" || state.phase === "commit") state.phase = "browser-prepare";
       }
       if (options.agentSandbox) state.agentSandbox = options.agentSandbox;
+      if (options.agent) state.agent = options.agent;
       active = true;
     } else {
+      await command(options.agent ?? "codex", ["--version"], root, { signal });
       if (await git(root, "status", "--porcelain", "--untracked-files=all")) throw new Error("Start requires a clean Git tree. Commit or move existing changes first; Ralph never stashes them.");
       const goal = (options.goal ?? await readFile(path.resolve(cwd, options.goalFile!), "utf8")).trim();
       if (!goal) throw new Error("Goal must not be empty");
@@ -298,7 +306,7 @@ export async function runRalph(options: Options, cwd = process.cwd(), signal?: A
       await mkdir(dir);
       state = {
         version: 1, id, root, branch: `ralph/${id}`, head: await git(root, "rev-parse", "HEAD"),
-        fingerprint: "", goal, model: options.model ?? "", iterations: options.iterations,
+        fingerprint: "", goal, model: options.model ?? "", agent: options.agent ?? "codex", iterations: options.iterations,
         maxFixAttempts: options.maxFixAttempts, timeoutMinutes: options.timeoutMinutes,
         completed: 0, phase: "baseline", repairs: 0, candidate: null, feedback: [], history: [], summary: "", lastError: "",
         baseUrl: options.baseUrl ?? "http://localhost:3000", browserResult: null,
@@ -335,9 +343,26 @@ export async function runRalph(options: Options, cwd = process.cwd(), signal?: A
       await writeFile(artifact("prompt.txt"), input);
       const before = await fingerprint(root);
       const sandbox = s.agentSandbox === "danger-full-access" ? "danger-full-access" : writable ? "workspace-write" : "read-only";
-      await command("codex", ["--ask-for-approval", "never", "exec", "--ephemeral", "--sandbox", sandbox,
-        "--cd", root, "--json", "--output-schema", schemaFile, "--output-last-message", output,
-        ...(s.model ? ["--model", s.model] : []), "-"], root, { input, log, timeoutMs, signal });
+      if (s.agent === "codex") {
+        await command(s.agent, ["--ask-for-approval", "never", "exec", "--ephemeral", "--sandbox", sandbox,
+          "--cd", root, "--json", "--output-schema", schemaFile, "--output-last-message", output,
+          ...(s.model ? ["--model", s.model] : []), "-"], root, { input, log, timeoutMs, signal });
+      } else {
+        const args = ["--print", "--output-format", "json"];
+        if (s.agentSandbox === "danger-full-access") args.push("--dangerously-skip-permissions");
+        else if (writable) args.push("--permission-mode", "acceptEdits", "--allowedTools", "Bash");
+        else args.push("--allowedTools", "Read", "Grep", "Glob");
+        if (s.model) args.push("--model", s.model);
+        const result = await command(s.agent, args, root, {
+          input: `${input}\n\nReturn only a JSON object matching this JSON Schema:\n${await readFile(schemaFile, "utf8")}`,
+          log, timeoutMs, signal, captureStdout: true,
+        });
+        const response = JSON.parse(result) as { result?: string };
+        if (typeof response.result !== "string") throw new Error("Claude CLI returned no result text");
+        const json = response.result.match(/\{[\s\S]*\}/)?.[0];
+        if (!json) throw new Error("Claude CLI did not return a JSON phase result");
+        await writeFile(output, json);
+      }
       await assertHead();
       if (!writable && before !== await fingerprint(root)) throw new Error("Read-only phase modified repository files");
       return schema.parse(JSON.parse(await readFile(output, "utf8")));
@@ -466,7 +491,9 @@ export async function runRalph(options: Options, cwd = process.cwd(), signal?: A
           if (verification.browser && !s.browserResult) { s.phase = "browser-prepare"; break; }
           const reviewInstructions = verification.browser
             ? "The host has already executed Playwright outside this sandbox. Inspect browserResult.report, browserResult.artifacts, and the spec; do not launch a server or browser here. Decide whether those actual tests cover the changed user-facing flows and acceptance criteria."
-            : "Browser verification is disabled for this project. Inspect and run meaningful CLI/library tests, with external services mocked at the process boundary when appropriate. Do not require a web server, Playwright spec, or browser evidence for non-browser changes. If the increment introduces browser behavior, report the missing browser verification as a finding.";
+            : s.agent === "claude"
+              ? "Browser verification is disabled for this project. The host has already run the configured CLI checks; inspect their logs under runDirectory along with meaningful CLI/library tests and changed code. This is a read-only phase; do not execute shell commands. Do not require a web server, Playwright spec, or browser evidence for non-browser changes. If the increment introduces browser behavior, report the missing browser verification as a finding."
+              : "Browser verification is disabled for this project. Inspect and run meaningful CLI/library tests, with external services mocked at the process boundary when appropriate. Do not require a web server, Playwright spec, or browser evidence for non-browser changes. If the increment introduces browser behavior, report the missing browser verification as a finding.";
           const result = await agent(reviewSchema, `Independently inspect the full diff against HEAD, tests, and selected acceptance criteria. Check correctness, regressions, accessibility, data compatibility, and unsupported claims. ${reviewInstructions} Missing coverage is a concrete finding. Acceptance evidence must substantiate each criterion. Return all concrete unresolved defects in findings; an empty list means none found. Implementation report: ${JSON.stringify(s.summary)}`, false);
           s.feedback = [...result.findings];
           if (!result.acceptancePassed || !result.acceptanceEvidence.length) s.feedback.push("Acceptance criteria lack passing evidence");

@@ -11,6 +11,7 @@ export const progressPage = String.raw`<!doctype html>
 .recovery{background:var(--danger-bg);border:1px solid var(--line);border-radius:6px;padding:18px 20px;margin-bottom:24px;overflow-wrap:anywhere}.recovery h2{color:var(--danger);margin-bottom:12px}.recovery dd{max-width:75ch}.recovery pre{color:var(--ink)}
 .outcome{display:block;font-size:13px;font-weight:600;margin-top:3px;overflow-wrap:anywhere}.entry.good .outcome{color:var(--accent)}.entry.bad .outcome{color:var(--danger)}.outcome-context{font-size:13px;color:var(--muted);margin-top:3px;white-space:pre-wrap;overflow-wrap:anywhere}
 .event-context{display:flex;flex-wrap:wrap;gap:2px 14px;font-size:12px;color:var(--muted);margin-top:4px;overflow-wrap:anywhere}.event-context span{min-width:0;max-width:100%}
+.selection{margin-bottom:28px;padding-bottom:22px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}.selection-context{font-size:12px;color:var(--muted);margin:5px 0 10px}.selection-title{font-size:17px;font-weight:600;white-space:pre-wrap;max-width:72ch;margin:0 0 12px}.selection summary{font-size:13px;padding:6px 0}.selection dd{max-width:75ch}.selection dl{margin-top:12px}
 </style>
 </head>
 <body>
@@ -23,6 +24,7 @@ export const progressPage = String.raw`<!doctype html>
 <div class="facts" aria-label="Latest activity"><div class="fact"><span>Latest phase</span><strong id="phase">Waiting</strong></div><div class="fact"><span>Iteration</span><strong id="iteration">—</strong></div><div class="fact"><span>Last event</span><strong id="latest">—</strong></div></div>
 <div class="toolbar"><label class="field">Run<select id="run"><option value="">All runs</option></select></label><label class="field search">Search events<input type="search" id="search" placeholder="Find a phase, command, or decision…"></label><label class="live"><input type="checkbox" id="live" checked>Live updates</label></div>
 <section class="recovery" id="recovery" aria-labelledby="recovery-heading" hidden><h2 id="recovery-heading">Run stopped · changes preserved</h2><dl id="recovery-details"></dl></section>
+<section class="selection" aria-labelledby="selection-heading"><h2 id="selection-heading">Selected increment</h2><p class="selection-context" id="selection-context"></p><p class="selection-title" id="selection-title">No candidate selection recorded for this run.</p><details id="selection-disclosure" hidden><summary>Rationale and acceptance criteria</summary><dl id="selection-details"></dl></details></section>
 <div class="activity-heading"><h2>Activity</h2><span class="count" id="count" aria-live="polite">Loading…</span></div>
 <div class="events" id="events"></div>
 <div class="empty" id="empty"><strong id="empty-title">Loading progress</strong><p id="empty-text">Reading the latest events.</p></div>
@@ -115,6 +117,38 @@ function renderRecovery(entries) {
     fields.append(definition);
   }
 }
+let selectionSignature = '';
+function renderSelection(entries, run) {
+  const selected = entries.findLast(entry => entry.event === 'Candidate selected');
+  const signature = JSON.stringify([run, selected]);
+  // Keep the native disclosure and keyboard focus intact on unrelated refreshes.
+  if (signature === selectionSignature) return;
+  selectionSignature = signature;
+  const recorded = selected ? body(selected) : {};
+  const candidate = recorded.candidate && typeof recorded.candidate === 'object' && !Array.isArray(recorded.candidate) ? recorded.candidate : {};
+  const iteration = Number.isSafeInteger(recorded.iteration) && recorded.iteration > 0 ? 'Iteration: ' + recorded.iteration : 'Iteration not recorded';
+  $('selection-context').textContent = run ? 'Run: ' + run + (selected ? ' · ' + iteration : '') : 'No run available';
+  $('selection-title').textContent = selected
+    ? typeof candidate.title === 'string' && candidate.title.trim() ? candidate.title : 'Candidate title not recorded.'
+    : 'No candidate selection recorded for this run.';
+  const disclosure = $('selection-disclosure');
+  disclosure.hidden = !selected;
+  disclosure.open = false;
+  const fields = $('selection-details');
+  fields.replaceChildren();
+  if (!selected) return;
+  for (const [label, value, fallback] of [
+    ['Rationale', candidate.rationale, 'No rationale recorded.'],
+    ['Acceptance criteria', candidate.acceptanceCriteria, 'No acceptance criteria recorded.']
+  ]) {
+    const available = value !== undefined && value !== null && !(typeof value === 'string' && !value.trim()) &&
+      !(Array.isArray(value) && !value.length) && !(typeof value === 'object' && !Object.keys(value).length);
+    fields.append(element('dt', label));
+    const definition = element('dd');
+    definition.append(details(available ? value : fallback));
+    fields.append(definition);
+  }
+}
 function render() {
   const focusedKey = document.activeElement && document.activeElement.tagName === 'SUMMARY' && document.activeElement.parentElement.dataset.key;
   updateRuns();
@@ -123,6 +157,7 @@ function render() {
   const summaryRun = run || (data.entries.at(-1) || {}).run;
   const summaryEntries = data.entries.filter(entry => entry.run === summaryRun);
   renderRecovery(summaryEntries);
+  renderSelection(summaryEntries, summaryRun);
   const latestPhase = summaryEntries.findLast(entry => entry.event === 'Phase started');
   const latest = summaryEntries.at(-1);
   const start = summaryEntries.find(entry => entry.event === 'Run started');

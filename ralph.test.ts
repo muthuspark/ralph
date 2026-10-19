@@ -103,6 +103,86 @@ test("CLI records failed checks and resumes in the target repository without los
   }
 });
 
+test("Claude CLI completes a verified iteration with captured JSON and phase-scoped permissions", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "ralph-claude-loop-"));
+  try {
+    await mkdir(path.join(root, "bin"));
+    await writeFile(path.join(root, ".gitignore"), ".ralph/\n");
+    await writeFile(path.join(root, "pyproject.toml"), '[project]\nname = "fixture"\n');
+    await writeFile(path.join(root, "app.py"), "answer = 1\n");
+    const mock = `#!/usr/bin/env node
+const fs = require('node:fs');
+if (process.argv[2] === '--version') process.exit(0);
+let prompt = '';
+process.stdin.on('data', chunk => prompt += chunk);
+process.stdin.on('end', () => {
+  fs.appendFileSync('.ralph/claude-args.jsonl', JSON.stringify(process.argv.slice(2)) + '\\n');
+  let result;
+  if (prompt.includes('PHASE: discover')) {
+    result = { candidates: Array.from({length: 5}, (_, i) => ({
+      title: 'Claude fix answer ' + i, category: 'correctness', rationale: 'Fixture', evidence: ['app.py'],
+      acceptanceCriteria: ['answer is 42'], impact: 5, confidence: 5, effort: 1, risk: 1,
+      mustDo: { productManager: {score: 5, rationale: 'Fixture'}, subjectMatterExpert: {score: 5, rationale: 'Fixture', domain: 'arithmetic'} }
+    })) };
+  } else if (prompt.includes('PHASE: implement')) {
+    fs.writeFileSync('app.py', 'answer = 42\\n');
+    fs.mkdirSync('tests');
+    fs.writeFileSync('tests/test_app.py', 'import unittest\\nfrom app import answer\\nclass AnswerTest(unittest.TestCase):\\n    def test_answer(self):\\n        self.assertEqual(answer, 42)\\n');
+    result = { summary: 'Fixed answer with Claude', decisions: [{decision: 'Use 42', reason: 'Acceptance criterion'}] };
+  } else if (prompt.includes('PHASE: review')) {
+    result = { summary: 'Claude fixture review', acceptancePassed: true, acceptanceEvidence: ['tests/test_app.py'], userFacing: true, browserEvidence: [], findings: [] };
+  } else { process.exit(98); }
+  process.stdout.write(JSON.stringify({ result: JSON.stringify(result) }));
+});
+`;
+    await writeFile(path.join(root, "bin", "claude"), mock, { mode: 0o755 });
+    await exec("git", ["init", "-b", "main"], { cwd: root });
+    for (const [key, value] of [["user.name", "Ralph Test"], ["user.email", "ralph@example.test"], ["commit.gpgsign", "false"]]) {
+      await exec("git", ["config", key, value], { cwd: root });
+    }
+    await exec("git", ["add", "."], { cwd: root });
+    await exec("git", ["commit", "-m", "Fixture"], { cwd: root });
+    const { stdout } = await exec(process.execPath, [createRequire(import.meta.url).resolve("tsx/cli"),
+      fileURLToPath(new URL("./cli.ts", import.meta.url)), "--goal", "Fix answer", "--agent", "claude", "--iterations", "1"], {
+      cwd: root, env: { ...process.env, PATH: `${path.join(root, "bin")}${path.delimiter}${process.env.PATH}` },
+    });
+    assert.match(stdout, /Finished 1 verified iterations/);
+    const calls = (await readFile(path.join(root, ".ralph", "claude-args.jsonl"), "utf8"))
+      .trim().split("\n").map(line => JSON.parse(line) as string[]);
+    const discover = calls.find(args => args.includes("Read") && args.includes("Glob"));
+    const implement = calls.find(args => args.includes("acceptEdits"));
+    const review = calls.find(args => args.includes("Grep") && !args.includes("acceptEdits"));
+    assert.ok(discover?.includes("--allowedTools"));
+    assert.ok(!discover?.includes("--permission-mode") || !discover.includes("plan"));
+    assert.ok(implement?.includes("Bash"));
+    assert.ok(review?.includes("Read"));
+    assert.ok(!review?.includes("plan"));
+    assert.equal((await exec("git", ["status", "--porcelain"], { cwd: root })).stdout, "");
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("missing agent CLI fails before creating a branch or progress entry", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "ralph-preflight-"));
+  try {
+    const bin = path.join(root, "bin");
+    await mkdir(bin);
+    await writeFile(path.join(bin, "claude"), "#!/usr/bin/env node\nprocess.exit(2);\n", { mode: 0o755 });
+    await writeFile(path.join(root, ".gitignore"), ".ralph/\n");
+    await writeFile(path.join(root, "package.json"), JSON.stringify({ scripts: { lint: "true", typecheck: "true", test: "true", build: "true" } }));
+    await exec("git", ["init", "-b", "main"], { cwd: root });
+    await exec("git", ["add", "."], { cwd: root });
+    await exec("git", ["-c", "user.name=Ralph Test", "-c", "user.email=ralph@example.test", "-c", "commit.gpgsign=false", "commit", "-m", "Fixture"], { cwd: root });
+    const cli = fileURLToPath(new URL("./cli.ts", import.meta.url));
+    await assert.rejects(exec(process.execPath, [createRequire(import.meta.url).resolve("tsx/cli"), cli,
+      "--goal", "Preflight", "--agent", "claude"], {
+      cwd: root, env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` },
+    }));
+    assert.equal((await exec("git", ["branch", "--show-current"], { cwd: root })).stdout.trim(), "main");
+    await assert.rejects(readFile(path.join(root, "progress.txt"), "utf8"), { code: "ENOENT" });
+    assert.equal((await exec("git", ["status", "--porcelain"], { cwd: root })).stdout, "");
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
 test("Python verification detects sources, requires new tests, and supports explicit commands", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "ralph-python-"));
   try {

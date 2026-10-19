@@ -10,6 +10,7 @@ export const progressPage = String.raw`<!doctype html>
 @media(max-width:640px){.top{padding:14px 18px}.brand span{display:none}main{padding:26px 18px 40px}.title{align-items:start}h1{font-size:26px}.goal{font-size:15px}.facts{gap:10px 24px}.toolbar{gap:14px}.field{width:100%}.live{padding:0}.entry>summary{grid-template-columns:68px minmax(0,1fr) 16px;gap:8px;padding:16px 0}.time{font-size:10px}.event-body{margin:0 0 18px;padding:14px}select{min-width:0;width:100%}footer{flex-direction:column;gap:4px}}
 .recovery{background:var(--danger-bg);border:1px solid var(--line);border-radius:6px;padding:18px 20px;margin-bottom:24px;overflow-wrap:anywhere}.recovery h2{color:var(--danger);margin-bottom:12px}.recovery dd{max-width:75ch}.recovery pre{color:var(--ink)}
 .outcome{display:block;font-size:13px;font-weight:600;margin-top:3px;overflow-wrap:anywhere}.entry.good .outcome{color:var(--accent)}.entry.bad .outcome{color:var(--danger)}.outcome-context{font-size:13px;color:var(--muted);margin-top:3px;white-space:pre-wrap;overflow-wrap:anywhere}
+.event-context{display:flex;flex-wrap:wrap;gap:2px 14px;font-size:12px;color:var(--muted);margin-top:4px;overflow-wrap:anywhere}.event-context span{min-width:0;max-width:100%}
 </style>
 </head>
 <body>
@@ -62,6 +63,27 @@ function outcome(entry) {
   }
   return null;
 }
+// Annotate in append order before selecting a run, searching, or reversing.
+// Only phase boundaries seed later rows, and every run has its own boundary.
+function contextualEntries(entries) {
+  const boundaries = new Map();
+  return entries.map((entry, index) => {
+    const d = body(entry);
+    const recorded = {
+      iteration: Number.isSafeInteger(d.iteration) && d.iteration > 0 ? d.iteration : null,
+      phase: typeof d.phase === 'string' && d.phase.trim() ? d.phase : null
+    };
+    if (entry.event === 'Run started' || entry.event === 'Run resumed') boundaries.delete(entry.run);
+    if (entry.event === 'Phase started') boundaries.set(entry.run, recorded);
+    const boundary = boundaries.get(entry.run) || {};
+    // An explicit different iteration cannot borrow the previous iteration's phase.
+    const sameIteration = recorded.iteration === null || recorded.iteration === boundary.iteration;
+    return {...entry, key:entry.timestamp + ':' + index, context:{
+      iteration:recorded.iteration ?? boundary.iteration ?? null,
+      phase:recorded.phase ?? (sameIteration ? boundary.phase : null) ?? null
+    }};
+  });
+}
 function updateRuns() {
   const runs = [...new Set(data.entries.map(entry => entry.run))].reverse();
   const current = $('run').value;
@@ -97,7 +119,7 @@ function render() {
   const focusedKey = document.activeElement && document.activeElement.tagName === 'SUMMARY' && document.activeElement.parentElement.dataset.key;
   updateRuns();
   const run = $('run').value;
-  const entries = data.entries.map((entry,index) => ({...entry, key:entry.timestamp + ':' + index})).filter(entry => !run || entry.run === run);
+  const entries = contextualEntries(data.entries).filter(entry => !run || entry.run === run);
   const summaryRun = run || (data.entries.at(-1) || {}).run;
   const summaryEntries = data.entries.filter(entry => entry.run === summaryRun);
   renderRecovery(summaryEntries);
@@ -129,6 +151,11 @@ function render() {
     const time = element('time', isNaN(date.getTime()) ? entry.timestamp : date.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}), 'time');
     time.dateTime = entry.timestamp; time.title = entry.timestamp;
     const info = element('div'); info.append(element('div', entry.event, 'event-title'));
+    const provenance = element('div', undefined, 'event-context');
+    if (!run) provenance.append(element('span', 'Run: ' + entry.run));
+    if (entry.context.iteration !== null) provenance.append(element('span', 'Iteration: ' + entry.context.iteration));
+    if (entry.context.phase !== null) provenance.append(element('span', 'Phase: ' + entry.context.phase));
+    if (provenance.children.length) info.append(provenance);
     if (result) {
       info.append(element('div', result.label, 'outcome'));
       if (result.context) info.append(element('div', result.context, 'outcome-context'));

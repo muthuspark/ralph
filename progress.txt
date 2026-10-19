@@ -1457,3 +1457,408 @@ Verified: lint, TypeScript check, 8 tests (including a complete mocked Python lo
   "decision": "Generate five new candidates after this commit",
   "commitMessage": "ralph: Expose verification and review outcomes in collapsed event rows\n\nRalph-Run: 20261019143450543-bfef85b6\nRalph-Iteration: 3"
 }
+
+[2026-10-19T14:56:44.229Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 4,
+  "phase": "discover"
+}
+
+[2026-10-19T14:57:57.569Z] 20261019143450543-bfef85b6 — Five candidates generated and ranked
+{
+  "formula": "mustDo.productManager.score + mustDo.subjectMatterExpert.score",
+  "tieBreaker": "impact * confidence / (effort * risk), higher impact, lower effort, proposal order",
+  "ranked": [
+    {
+      "title": "Identify each collapsed event's run, iteration, and phase",
+      "category": "Activity comprehension",
+      "rationale": "Developers need to attribute repeated checks and decisions to the correct execution attempt. Add compact context to collapsed rows, using recorded fields and same-run phase boundaries only. Expected reductions in mistaken attribution are hypotheses; this assessment used source inspection, not browser execution or user research.",
+      "evidence": [
+        "README.md:3 describes goal-driven coding iterations, establishing the domain as AI coding workflow observability rather than formal education.",
+        "ralph-server-page.ts:100 supports an All runs timeline, but lines 129–140 show only time, event, and preview in collapsed rows; run identity appears inside expanded metadata.",
+        "ralph.ts:393–409 records iteration and phase on check and phase events, while ralph-server-page.ts:47 usually previews only the command or phase.",
+        "ralph-server-page.ts:111–114 displays one latest iteration above a timeline containing historical iterations."
+      ],
+      "acceptanceCriteria": [
+        "Collapsed rows identify their run in All runs mode and identify recorded iteration and phase where available.",
+        "Context inherited from Phase started events is calculated independently per run in chronological log order before filtering or reversing.",
+        "Missing context stays explicitly unknown or omitted; it never inherits from another run or a later event.",
+        "Host browser fixtures cover interleaved runs, repeated commands across iterations, search, and live append without executing jobs."
+      ],
+      "impact": 4,
+      "confidence": 5,
+      "effort": 2,
+      "risk": 2,
+      "mustDo": {
+        "productManager": {
+          "score": 4,
+          "rationale": "Reliable attribution is urgent for a supervision tool: otherwise developers learning what happened can associate a failure or approval with the wrong attempt. The source establishes ambiguity, though its frequency and user impact are unmeasured."
+        },
+        "subjectMatterExpert": {
+          "score": 4,
+          "rationale": "Run, iteration, and phase are essential provenance for interpreting repeated verification events. Without them, users can draw materially incorrect conclusions about which work was checked.",
+          "domain": "AI coding workflow observability and verification provenance"
+        }
+      },
+      "index": 0,
+      "score": 5,
+      "mustDoScore": 8
+    },
+    {
+      "title": "Make event search match the outcome labels users can see",
+      "category": "Search correctness",
+      "rationale": "Extend the existing search corpus with displayed outcome labels and context. Users should be able to find a visible phrase such as Repair required without knowing its stored nextPhase representation. This is a bounded correctness improvement, independent of adding new filters.",
+      "evidence": [
+        "ralph-server-page.ts:52–61 derives labels including Repair required, Repair not requested, and Outcome not recorded.",
+        "ralph-server-page.ts:115–116 searches JSON.stringify(entry), excluding these derived labels.",
+        "ralph-server-page.ts:133–134 renders the derived labels and reasons prominently in collapsed rows.",
+        "e2e/ralph/20261019143450543-bfef85b6/iteration-3.spec.ts:104–138 contains fixtures for continuing and unknown outcomes that can support search verification."
+      ],
+      "acceptanceCriteria": [
+        "Searching a rendered outcome phrase finds the corresponding rows even when the phrase is absent from raw details.",
+        "Search continues to match recorded commands, errors, reasons, and nested details case-insensitively.",
+        "Whitespace-only queries behave like an empty search.",
+        "Host browser fixtures verify derived labels, unmatched queries, clearing search, and searching within a selected run."
+      ],
+      "impact": 3,
+      "confidence": 5,
+      "effort": 2,
+      "risk": 1,
+      "mustDo": {
+        "productManager": {
+          "score": 3,
+          "rationale": "Search should work with the language the interface teaches users. Failing to find a visibly displayed outcome undermines discovery and trust; the usability impact remains an evidence-based hypothesis."
+        },
+        "subjectMatterExpert": {
+          "score": 3,
+          "rationale": "Investigating repair decisions should not require knowledge of internal event encoding. Matching displayed terminology makes verification evidence accessible to developers learning the workflow.",
+          "domain": "AI coding workflow observability and verification provenance"
+        }
+      },
+      "index": 2,
+      "score": 7.5,
+      "mustDoScore": 6
+    },
+    {
+      "title": "Show calendar dates in the activity timeline",
+      "category": "Historical navigation",
+      "rationale": "Add visible local date boundaries so events from different days can be distinguished without expanding rows or hovering. Preserve full timestamp metadata and newest-first ordering. This is a small first slice for navigating the append-only history.",
+      "evidence": [
+        "README.md:135 describes progress.txt as an append-only timestamped record.",
+        "ralph-server-page.ts:129 displays only local time of day for each collapsed event.",
+        "ralph-server-page.ts:130 exposes the complete timestamp only through title metadata, and line 140 repeats it inside expanded details.",
+        "ralph-server-page.ts:116–117 can display events spanning multiple days together."
+      ],
+      "acceptanceCriteria": [
+        "Events spanning multiple local calendar days have visible date boundaries or equally clear per-row dates.",
+        "Date context remains correct after search, run selection, and Show more events.",
+        "Full timestamp metadata remains available, and invalid timestamps render safely without fabricated dates.",
+        "Host browser fixtures cover a local midnight boundary, matching times on different days, and mobile layout."
+      ],
+      "impact": 3,
+      "confidence": 5,
+      "effort": 2,
+      "risk": 1,
+      "mustDo": {
+        "productManager": {
+          "score": 3,
+          "rationale": "Historical review needs clear temporal context. Hidden dates add avoidable work and ambiguity for developers returning to older runs, though the prevalence of multi-day review is unknown."
+        },
+        "subjectMatterExpert": {
+          "score": 3,
+          "rationale": "A time of day alone cannot identify an event in a multi-day execution history. Visible dates support accurate chronology and help users understand when failures and subsequent repairs occurred.",
+          "domain": "AI coding workflow observability and verification provenance"
+        }
+      },
+      "index": 4,
+      "score": 7.5,
+      "mustDoScore": 6
+    },
+    {
+      "title": "Clearly distinguish paused updates from failed refreshes",
+      "category": "Data freshness",
+      "rationale": "Make connection messaging reflect whether updates are enabled, preserve the last successful check time, and distinguish a prior fetch failure from an active retry. Scope the change to truthful messaging and state transitions in the existing polling loop.",
+      "evidence": [
+        "ralph-server-page.ts:30 always states Updates every second, including when live updates are disabled.",
+        "ralph-server-page.ts:158 skips requests while paused, but a previously displayed error still says Retrying automatically.",
+        "ralph-server-page.ts:168–170 unconditionally sets Live after a successful in-flight request, even if the checkbox was disabled during that request.",
+        "ralph-server-page.ts:181 changes the label on checkbox interaction without coordinating completion of an outstanding refresh."
+      ],
+      "acceptanceCriteria": [
+        "Disabling Live updates during an outstanding successful request leaves the final status as paused.",
+        "Paused messaging and footer text do not promise active automatic retries or one-second updates.",
+        "The last successful check time remains available after an error or pause.",
+        "Host browser fixtures cover pause during a delayed response, pause after failure, and successful recovery after updates are re-enabled."
+      ],
+      "impact": 3,
+      "confidence": 5,
+      "effort": 2,
+      "risk": 2,
+      "mustDo": {
+        "productManager": {
+          "score": 3,
+          "rationale": "Developers must know whether displayed evidence is refreshing before making decisions. Contradictory freshness messages are important to fix, although no resulting user mistakes have been observed."
+        },
+        "subjectMatterExpert": {
+          "score": 3,
+          "rationale": "Transport freshness and recorded execution state are different facts. Accurate pause and retry messaging prevents users from treating a frozen snapshot as current workflow evidence.",
+          "domain": "AI coding workflow observability and verification provenance"
+        }
+      },
+      "index": 3,
+      "score": 3.75,
+      "mustDoScore": 6
+    },
+    {
+      "title": "Keep the event being read stable during live updates",
+      "category": "Live reading",
+      "rationale": "Preserve the visible event and its viewport offset when updates prepend rows within the same selected run. This first slice protects reading continuity without adding automatic scrolling or changing run-following behavior. The disruption risk is inferred from DOM replacement and requires host browser validation.",
+      "evidence": [
+        "ralph-server-page.ts:116 reverses events so appended activity appears above existing content.",
+        "ralph-server-page.ts:119–145 recreates every visible event and replaces the entire event container on render.",
+        "ralph-server-page.ts:97 and 146 restore summary focus, but contain no explicit viewport anchor preservation.",
+        "ralph-server-page.ts:157–176 polls every second and renders changed payloads."
+      ],
+      "acceptanceCriteria": [
+        "While reading an older expanded event, appending newer events preserves that event's viewport offset within a small documented tolerance.",
+        "The event stays expanded and keyboard focus remains on the same summary when applicable.",
+        "Preservation applies only while the selected run remains unchanged; deliberate search and run changes retain intentional navigation behavior.",
+        "Host browser fixtures verify multiple appends on desktop and mobile, including a reader positioned below the initial viewport."
+      ],
+      "impact": 4,
+      "confidence": 4,
+      "effort": 3,
+      "risk": 3,
+      "mustDo": {
+        "productManager": {
+          "score": 3,
+          "rationale": "Reading explanations while work continues is a central task. Losing position can interrupt comprehension repeatedly, although the actual browser behavior and incidence have not been measured."
+        },
+        "subjectMatterExpert": {
+          "score": 3,
+          "rationale": "Continuous access to historical evidence helps developers understand failure and repair sequences. An unstable reading position makes that analysis harder and encourages superficial interpretation.",
+          "domain": "AI coding workflow observability and verification provenance"
+        }
+      },
+      "index": 1,
+      "score": 1.7777777777777777,
+      "mustDoScore": 6
+    }
+  ]
+}
+
+[2026-10-19T14:57:57.570Z] 20261019143450543-bfef85b6 — Candidate selected
+{
+  "iteration": 4,
+  "candidate": {
+    "title": "Identify each collapsed event's run, iteration, and phase",
+    "category": "Activity comprehension",
+    "rationale": "Developers need to attribute repeated checks and decisions to the correct execution attempt. Add compact context to collapsed rows, using recorded fields and same-run phase boundaries only. Expected reductions in mistaken attribution are hypotheses; this assessment used source inspection, not browser execution or user research.",
+    "evidence": [
+      "README.md:3 describes goal-driven coding iterations, establishing the domain as AI coding workflow observability rather than formal education.",
+      "ralph-server-page.ts:100 supports an All runs timeline, but lines 129–140 show only time, event, and preview in collapsed rows; run identity appears inside expanded metadata.",
+      "ralph.ts:393–409 records iteration and phase on check and phase events, while ralph-server-page.ts:47 usually previews only the command or phase.",
+      "ralph-server-page.ts:111–114 displays one latest iteration above a timeline containing historical iterations."
+    ],
+    "acceptanceCriteria": [
+      "Collapsed rows identify their run in All runs mode and identify recorded iteration and phase where available.",
+      "Context inherited from Phase started events is calculated independently per run in chronological log order before filtering or reversing.",
+      "Missing context stays explicitly unknown or omitted; it never inherits from another run or a later event.",
+      "Host browser fixtures cover interleaved runs, repeated commands across iterations, search, and live append without executing jobs."
+    ],
+    "impact": 4,
+    "confidence": 5,
+    "effort": 2,
+    "risk": 2,
+    "mustDo": {
+      "productManager": {
+        "score": 4,
+        "rationale": "Reliable attribution is urgent for a supervision tool: otherwise developers learning what happened can associate a failure or approval with the wrong attempt. The source establishes ambiguity, though its frequency and user impact are unmeasured."
+      },
+      "subjectMatterExpert": {
+        "score": 4,
+        "rationale": "Run, iteration, and phase are essential provenance for interpreting repeated verification events. Without them, users can draw materially incorrect conclusions about which work was checked.",
+        "domain": "AI coding workflow observability and verification provenance"
+      }
+    }
+  },
+  "mustDoScore": 8,
+  "score": 5,
+  "reason": "Highest score among candidates whose titles have not been completed, ranked by combined role must-do scores; ties use value/cost, higher impact, lower effort, then proposal order",
+  "excludedCompletedTitles": []
+}
+
+[2026-10-19T14:57:57.584Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 4,
+  "phase": "implement"
+}
+
+[2026-10-19T15:00:11.165Z] 20261019143450543-bfef85b6 — Implementation completed; verification required
+{
+  "summary": "Implemented collapsed event run, iteration, and phase labels. All 34 render tests, lint, typecheck, build, and whitespace checks passed. Full npm test is blocked by sandbox IPC permissions (EPERM); host browser verification remains pending. Evidence and browser handoff: .ralph/20261019143450543-bfef85b6/evidence/event-context-verification.md.",
+  "decisions": [
+    {
+      "decision": "Show run labels in All runs mode and available iteration/phase labels in every view.",
+      "reason": "Clarifies attribution while avoiding redundant run labels."
+    },
+    {
+      "decision": "Calculate inherited context per run in log order before filtering or reversing.",
+      "reason": "Prevents cross-run and future-event leakage."
+    },
+    {
+      "decision": "Prioritize recorded fields and omit unknown context.",
+      "reason": "Avoids misleading attribution from stale or missing metadata."
+    },
+    {
+      "decision": "Include inherited context in search.",
+      "reason": "Lets phase searches find related checks."
+    }
+  ]
+}
+
+[2026-10-19T15:00:11.181Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 4,
+  "phase": "verify"
+}
+
+[2026-10-19T15:00:12.041Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 4,
+  "phase": "verify",
+  "command": "npm run lint",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/4-verify-1792422011182-94-lint.log"
+}
+
+[2026-10-19T15:00:13.556Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 4,
+  "phase": "verify",
+  "command": "npm run typecheck",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/4-verify-1792422012045-95-typecheck.log"
+}
+
+[2026-10-19T15:00:17.393Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 4,
+  "phase": "verify",
+  "command": "npm run test",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/4-verify-1792422013561-96-test.log"
+}
+
+[2026-10-19T15:00:18.951Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 4,
+  "phase": "verify",
+  "command": "npm run build",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/4-verify-1792422017397-97-build.log"
+}
+
+[2026-10-19T15:00:18.955Z] 20261019143450543-bfef85b6 — Verification decision
+{
+  "nextPhase": "browser-prepare",
+  "failures": []
+}
+
+[2026-10-19T15:00:18.969Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 4,
+  "phase": "browser-prepare"
+}
+
+[2026-10-19T15:03:15.056Z] 20261019143450543-bfef85b6 — Playwright coverage prepared
+{
+  "spec": "e2e/ralph/20261019143450543-bfef85b6/iteration-4.spec.ts",
+  "summary": "Created iteration-4.spec.ts with four browser tests. ESLint and typecheck passed. Browser tests were not run; the host will execute them.",
+  "decisions": [
+    {
+      "decision": "Cover interleaved runs, repeated commands, search, and run filtering.",
+      "reason": "Verify collapsed rows retain the correct historical attribution."
+    },
+    {
+      "decision": "Cover missing context, run boundaries, live append, mobile layout, and reload.",
+      "reason": "Verify context never leaks between runs or comes from later events."
+    },
+    {
+      "decision": "Reuse page-local fixtures with the production viewer.",
+      "reason": "Exercise visible behavior without jobs or user-data changes. File persistence and API parsing are outside this coverage."
+    }
+  ]
+}
+
+[2026-10-19T15:03:15.926Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 4,
+  "phase": "browser-prepare",
+  "command": "npm run lint",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/4-browser-prepare-1792422195056-102-lint.log"
+}
+
+[2026-10-19T15:03:17.497Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 4,
+  "phase": "browser-prepare",
+  "command": "npm run typecheck",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/4-browser-prepare-1792422195930-103-typecheck.log"
+}
+
+[2026-10-19T15:03:17.516Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 4,
+  "phase": "browser-run"
+}
+
+[2026-10-19T15:03:22.647Z] 20261019143450543-bfef85b6 — Host Playwright verification
+{
+  "status": "passed",
+  "passed": 4,
+  "reason": "All 4 browser tests passed",
+  "baseUrl": "http://localhost:3000",
+  "spec": "e2e/ralph/20261019143450543-bfef85b6/iteration-4.spec.ts",
+  "report": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/4-browser-run-1792422197539-104-playwright/results.json",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/4-browser-run-1792422197539-104-playwright/runner.log",
+  "artifacts": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/4-browser-run-1792422197539-104-playwright/artifacts"
+}
+
+[2026-10-19T15:03:22.663Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 4,
+  "phase": "review"
+}
+
+[2026-10-19T15:04:15.525Z] 20261019143450543-bfef85b6 — Independent review decision
+{
+  "summary": "Reviewed the full diff, attribution logic, tests, and host browser evidence. No unresolved defects found.",
+  "acceptancePassed": true,
+  "acceptanceEvidence": [
+    "Browser tests verify collapsed run labels in All runs mode and iteration/phase labels in both views.",
+    "Per-run boundaries are calculated in append order before filtering and reversal; interleaved runs and out-of-order timestamps are covered.",
+    "Tests verify omitted unknown context, partial boundaries, recorded overrides, lifecycle resets, and no cross-run or future-event inheritance.",
+    "Four host browser tests cover repeated commands, search, filtering, live append, reload, and mobile overflow using isolated fixtures without jobs.",
+    "Independent attribution tests and three existing render regression test files passed. Host logs record passing lint, typecheck, build, and all 16 full-suite tests. Whitespace check passed."
+  ],
+  "userFacing": true,
+  "browserEvidence": [
+    "Inspected iteration-4.spec.ts and results.json: 4 passed, 0 skipped, 0 unexpected, 0 flaky.",
+    "Inspected artifacts/.last-run.json: passed with no failed tests. No screenshots or traces were retained."
+  ],
+  "findings": [],
+  "nextPhase": "commit",
+  "unresolved": []
+}
+
+[2026-10-19T15:04:15.540Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 4,
+  "phase": "commit"
+}
+
+[2026-10-19T15:04:15.543Z] 20261019143450543-bfef85b6 — Verified iteration approved for commit
+{
+  "iteration": 4,
+  "candidate": "Identify each collapsed event's run, iteration, and phase",
+  "summary": "Implemented collapsed event run, iteration, and phase labels. All 34 render tests, lint, typecheck, build, and whitespace checks passed. Full npm test is blocked by sandbox IPC permissions (EPERM); host browser verification remains pending. Evidence and browser handoff: .ralph/20261019143450543-bfef85b6/evidence/event-context-verification.md.",
+  "decision": "Generate five new candidates after this commit",
+  "commitMessage": "ralph: Identify each collapsed event's run, iteration, and phase\n\nRalph-Run: 20261019143450543-bfef85b6\nRalph-Iteration: 4"
+}

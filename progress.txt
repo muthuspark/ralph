@@ -1057,3 +1057,403 @@ Verified: lint, TypeScript check, 8 tests (including a complete mocked Python lo
   "decision": "Generate five new candidates after this commit",
   "commitMessage": "ralph: Follow the most recently active run until the user explicitly selects a run\n\nRalph-Run: 20261019143450543-bfef85b6\nRalph-Iteration: 2"
 }
+
+[2026-10-19T14:50:21.396Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 3,
+  "phase": "discover"
+}
+
+[2026-10-19T14:51:52.702Z] 20261019143450543-bfef85b6 — Five candidates generated and ranked
+{
+  "formula": "mustDo.productManager.score + mustDo.subjectMatterExpert.score",
+  "tieBreaker": "impact * confidence / (effort * risk), higher impact, lower effort, proposal order",
+  "ranked": [
+    {
+      "title": "Expose verification and review outcomes in collapsed event rows",
+      "category": "Outcome clarity",
+      "rationale": "Make recorded failures, blocked checks, and repair decisions visible without expanding events. The expected benefit is faster, more accurate interpretation; no user impact has been measured.",
+      "evidence": [
+        "ralph-server-page.ts:104 classifies outcomes solely through event-name regexes; 'Host Playwright verification' and 'Independent review decision' receive no outcome treatment.",
+        "ralph-server-page.ts:46 omits status, reason, failures, and unresolved findings from previews.",
+        "ralph.ts:483 records browser status and reason; ralph.ts:506 records review nextPhase and unresolved findings."
+      ],
+      "acceptanceCriteria": [
+        "Collapsed browser-verification rows show explicit Passed, Failed, or Blocked text derived from recorded status, with the recorded reason.",
+        "Verification and independent-review decisions that route to repair show a repair-required outcome and recorded failure or finding context.",
+        "Unknown or missing fields remain neutral; successful checks never imply that the whole iteration is verified.",
+        "Host browser tests cover failed, blocked, passed, and incomplete fixtures using the production viewer without executing jobs."
+      ],
+      "impact": 4,
+      "confidence": 5,
+      "effort": 2,
+      "risk": 2,
+      "mustDo": {
+        "productManager": {
+          "score": 4,
+          "rationale": "Users monitoring work need to recognize failed acceptance checks promptly. Hiding these outcomes behind generic headings creates a significant gap in the viewer's central task."
+        },
+        "subjectMatterExpert": {
+          "score": 4,
+          "rationale": "Verification and review are distinct gates in autonomous coding. Their outcomes must be explicit so users learning the workflow do not confuse an executed check with a successful check.",
+          "domain": "Developer workflow observability for autonomous coding agents"
+        }
+      },
+      "index": 0,
+      "score": 5,
+      "mustDoScore": 8
+    },
+    {
+      "title": "Show the selected improvement above the activity timeline",
+      "category": "Task orientation",
+      "rationale": "Provide a compact summary of the latest selected candidate for the summary run: title, rationale, and acceptance criteria. This helps users understand what the current phases are working toward; the benefit is a hypothesis.",
+      "evidence": [
+        "ralph.ts:428 records the selected candidate with its rationale and acceptance criteria.",
+        "ralph-server-page.ts:86–96 summarizes goal, phase, iteration, and last event but omits the selected candidate.",
+        "ralph-server-page.ts:98–99 displays only the newest 100 events initially, so the selection can become buried."
+      ],
+      "acceptanceCriteria": [
+        "A labeled section above Activity shows the latest Candidate selected title, rationale, and acceptance criteria for the summary run.",
+        "Switching runs replaces the section with that run's candidate, or a clear absence state without stale content.",
+        "Search filtering does not remove or change the selected-work summary.",
+        "Live candidate changes update the section; incomplete candidate fields render safely as text."
+      ],
+      "impact": 4,
+      "confidence": 5,
+      "effort": 2,
+      "risk": 1,
+      "mustDo": {
+        "productManager": {
+          "score": 3,
+          "rationale": "Understanding the active increment is important to monitoring and reviewing progress, but users can currently recover the information from event details."
+        },
+        "subjectMatterExpert": {
+          "score": 3,
+          "rationale": "Acceptance criteria teach users what constitutes success for an increment and distinguish the broad goal from the work currently under verification.",
+          "domain": "Developer workflow observability for autonomous coding agents"
+        }
+      },
+      "index": 1,
+      "score": 10,
+      "mustDoScore": 6
+    },
+    {
+      "title": "Identify each event's run and the summary's run in All runs mode",
+      "category": "Context correctness",
+      "rationale": "Expose run identity in collapsed rows and explicitly label which run supplies the top summary. This prevents ambiguous attribution when runs are interleaved; actual error rates are unknown.",
+      "evidence": [
+        "ralph-server-page.ts:82 includes every run when All runs is selected, while lines 83–85 derive the summary from only the last active run.",
+        "ralph-server-page.ts:111–115 puts run identity only inside expanded metadata.",
+        "e2e/ralph/20261019143450543-bfef85b6/iteration-2.spec.ts explicitly exercises an All runs timeline whose summary switches between interleaved runs."
+      ],
+      "acceptanceCriteria": [
+        "In All runs mode, each collapsed row visibly identifies its run, including rows with identical titles and timestamps.",
+        "The goal, facts, and recovery area clearly identify the run supplying their summary.",
+        "A live event from another run updates summary attribution consistently without changing the explicit All runs selection.",
+        "Long run identifiers remain readable on narrow screens without horizontal page overflow."
+      ],
+      "impact": 4,
+      "confidence": 5,
+      "effort": 2,
+      "risk": 1,
+      "mustDo": {
+        "productManager": {
+          "score": 3,
+          "rationale": "Ambiguous attribution undermines trust when users inspect several runs together. Explicit identity is important, while single-run viewing remains available."
+        },
+        "subjectMatterExpert": {
+          "score": 3,
+          "rationale": "Evidence belongs to a particular execution. Clear provenance prevents users from attributing one run's failure or recovery instructions to another.",
+          "domain": "Developer workflow observability for autonomous coding agents"
+        }
+      },
+      "index": 3,
+      "score": 10,
+      "mustDoScore": 6
+    },
+    {
+      "title": "Add an event-type filter for checks, decisions, and failures",
+      "category": "Evidence navigation",
+      "rationale": "Add one filter alongside text search to isolate common investigation tasks without requiring knowledge of exact log wording. Faster investigation is an expected outcome, not a measured result.",
+      "evidence": [
+        "ralph-server-page.ts:22 offers run and free-text filters only.",
+        "ralph-server-page.ts:97–99 searches the full serialized entry and initially limits results to 100.",
+        "ralph.ts:393–398, 428, 483, and 506 record distinct check, selection, browser-verification, and review events suitable for explicit categories."
+      ],
+      "acceptanceCriteria": [
+        "A labeled event-type control offers All events, Checks, Decisions, and Failures with documented mappings to existing event names and outcome fields.",
+        "The filter combines with run selection and text search, and counts reflect the combined results.",
+        "Changing the filter resets pagination; Show more events continues within the filtered result set.",
+        "An empty result explains the active filtering and provides a keyboard-accessible way to clear event and text filters without changing the run."
+      ],
+      "impact": 3,
+      "confidence": 4,
+      "effort": 2,
+      "risk": 2,
+      "mustDo": {
+        "productManager": {
+          "score": 3,
+          "rationale": "Finding checks and decisions in long runs is important to usability, although text search provides an existing workaround."
+        },
+        "subjectMatterExpert": {
+          "score": 3,
+          "rationale": "Separating evidence types helps users understand the workflow and locate diagnostic records without memorizing event names. Incorrect category mappings must be avoided.",
+          "domain": "Developer workflow observability for autonomous coding agents"
+        }
+      },
+      "index": 4,
+      "score": 3,
+      "mustDoScore": 6
+    },
+    {
+      "title": "Keep expanded event content stable during live updates",
+      "category": "Reading continuity",
+      "rationale": "Reuse unchanged event rows when new data arrives so readers can continue selecting, copying, and examining details. Source inspection identifies a disruption risk; browser reproduction remains required.",
+      "evidence": [
+        "ralph-server-page.ts:101–120 recreates every displayed event and replaces the entire events subtree on each changed payload.",
+        "ralph-server-page.ts:79 and 121 restore focus only for SUMMARY elements; text selections inside expanded content are not preserved.",
+        "ralph-server-page.ts:135–141 polls and renders changed log data while Live updates is enabled."
+      ],
+      "acceptanceCriteria": [
+        "Appending a test-owned event retains the DOM node and open state of an unchanged expanded event that remains in the visible window.",
+        "A text selection inside that event survives the append and still selects the same text.",
+        "Keyboard focus on an unchanged event summary remains stable during polling.",
+        "Changed details, explicit filtering, and run switches still render correctly without stale content."
+      ],
+      "impact": 4,
+      "confidence": 4,
+      "effort": 3,
+      "risk": 3,
+      "mustDo": {
+        "productManager": {
+          "score": 3,
+          "rationale": "Reading detailed evidence is a core viewer task. Repeated disruption can force users to pause updates, though its frequency and severity have not been measured."
+        },
+        "subjectMatterExpert": {
+          "score": 3,
+          "rationale": "Reliable inspection and copying of commands, findings, and evidence paths support accurate diagnosis. Stable content reduces mistakes while users learn from a live run.",
+          "domain": "Developer workflow observability for autonomous coding agents"
+        }
+      },
+      "index": 2,
+      "score": 1.7777777777777777,
+      "mustDoScore": 6
+    }
+  ]
+}
+
+[2026-10-19T14:51:52.703Z] 20261019143450543-bfef85b6 — Candidate selected
+{
+  "iteration": 3,
+  "candidate": {
+    "title": "Expose verification and review outcomes in collapsed event rows",
+    "category": "Outcome clarity",
+    "rationale": "Make recorded failures, blocked checks, and repair decisions visible without expanding events. The expected benefit is faster, more accurate interpretation; no user impact has been measured.",
+    "evidence": [
+      "ralph-server-page.ts:104 classifies outcomes solely through event-name regexes; 'Host Playwright verification' and 'Independent review decision' receive no outcome treatment.",
+      "ralph-server-page.ts:46 omits status, reason, failures, and unresolved findings from previews.",
+      "ralph.ts:483 records browser status and reason; ralph.ts:506 records review nextPhase and unresolved findings."
+    ],
+    "acceptanceCriteria": [
+      "Collapsed browser-verification rows show explicit Passed, Failed, or Blocked text derived from recorded status, with the recorded reason.",
+      "Verification and independent-review decisions that route to repair show a repair-required outcome and recorded failure or finding context.",
+      "Unknown or missing fields remain neutral; successful checks never imply that the whole iteration is verified.",
+      "Host browser tests cover failed, blocked, passed, and incomplete fixtures using the production viewer without executing jobs."
+    ],
+    "impact": 4,
+    "confidence": 5,
+    "effort": 2,
+    "risk": 2,
+    "mustDo": {
+      "productManager": {
+        "score": 4,
+        "rationale": "Users monitoring work need to recognize failed acceptance checks promptly. Hiding these outcomes behind generic headings creates a significant gap in the viewer's central task."
+      },
+      "subjectMatterExpert": {
+        "score": 4,
+        "rationale": "Verification and review are distinct gates in autonomous coding. Their outcomes must be explicit so users learning the workflow do not confuse an executed check with a successful check.",
+        "domain": "Developer workflow observability for autonomous coding agents"
+      }
+    }
+  },
+  "mustDoScore": 8,
+  "score": 5,
+  "reason": "Highest score among candidates whose titles have not been completed, ranked by combined role must-do scores; ties use value/cost, higher impact, lower effort, then proposal order",
+  "excludedCompletedTitles": []
+}
+
+[2026-10-19T14:51:52.729Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 3,
+  "phase": "implement"
+}
+
+[2026-10-19T14:53:44.269Z] 20261019143450543-bfef85b6 — Implementation completed; verification required
+{
+  "summary": "Implemented collapsed verification and review outcomes with visible reasons and repair context. All 28 render tests, lint, typecheck, build, and whitespace checks passed. Evidence: .ralph/20261019143450543-bfef85b6/evidence/outcomes-verification.md. Browser verification and the server-starting full suite remain for the host.",
+  "decisions": [
+    {
+      "decision": "Show explicit outcome labels and unclamped context.",
+      "reason": "Failures and repair reasons must be readable without expanding rows."
+    },
+    {
+      "decision": "Use recorded status and repair routing; keep incomplete records neutral.",
+      "reason": "Avoid inferring success or implying whole-iteration verification."
+    },
+    {
+      "decision": "Combine review findings and unresolved context, removing duplicates.",
+      "reason": "Expose all recorded repair reasons without repetition."
+    },
+    {
+      "decision": "Use production-script render tests and provide a browser handoff.",
+      "reason": "Validate behavior while respecting the prohibition on sandbox servers and browsers."
+    }
+  ]
+}
+
+[2026-10-19T14:53:44.316Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 3,
+  "phase": "verify"
+}
+
+[2026-10-19T14:53:45.624Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 3,
+  "phase": "verify",
+  "command": "npm run lint",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/3-verify-1792421624317-70-lint.log"
+}
+
+[2026-10-19T14:53:47.424Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 3,
+  "phase": "verify",
+  "command": "npm run typecheck",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/3-verify-1792421625635-71-typecheck.log"
+}
+
+[2026-10-19T14:53:51.291Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 3,
+  "phase": "verify",
+  "command": "npm run test",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/3-verify-1792421627428-72-test.log"
+}
+
+[2026-10-19T14:53:52.871Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 3,
+  "phase": "verify",
+  "command": "npm run build",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/3-verify-1792421631295-73-build.log"
+}
+
+[2026-10-19T14:53:52.875Z] 20261019143450543-bfef85b6 — Verification decision
+{
+  "nextPhase": "browser-prepare",
+  "failures": []
+}
+
+[2026-10-19T14:53:52.889Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 3,
+  "phase": "browser-prepare"
+}
+
+[2026-10-19T14:55:42.552Z] 20261019143450543-bfef85b6 — Playwright coverage prepared
+{
+  "spec": "e2e/ralph/20261019143450543-bfef85b6/iteration-3.spec.ts",
+  "summary": "Created iteration-3.spec.ts with 11 browser tests. ESLint and targeted TypeScript checks passed. Browser execution remains with the host.",
+  "decisions": [
+    {
+      "decision": "Cover passed, failed, blocked, repair-required, and incomplete outcomes in collapsed rows.",
+      "reason": "Verifies explicit labels and recorded reasons, failures, and findings without opening events."
+    },
+    {
+      "decision": "Cover reloads, live updates, mobile rendering, and inert text.",
+      "reason": "Checks that outcomes remain readable and historical failures remain available."
+    },
+    {
+      "decision": "Use the production viewer with existing page-local fixture patterns.",
+      "reason": "Avoids jobs and user-data changes. Coverage validates rendering, not grading or file persistence."
+    }
+  ]
+}
+
+[2026-10-19T14:55:43.426Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 3,
+  "phase": "browser-prepare",
+  "command": "npm run lint",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/3-browser-prepare-1792421742552-78-lint.log"
+}
+
+[2026-10-19T14:55:44.962Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 3,
+  "phase": "browser-prepare",
+  "command": "npm run typecheck",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/3-browser-prepare-1792421743431-79-typecheck.log"
+}
+
+[2026-10-19T14:55:44.980Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 3,
+  "phase": "browser-run"
+}
+
+[2026-10-19T14:55:50.113Z] 20261019143450543-bfef85b6 — Host Playwright verification
+{
+  "status": "passed",
+  "passed": 11,
+  "reason": "All 11 browser tests passed",
+  "baseUrl": "http://localhost:3000",
+  "spec": "e2e/ralph/20261019143450543-bfef85b6/iteration-3.spec.ts",
+  "report": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/3-browser-run-1792421745002-80-playwright/results.json",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/3-browser-run-1792421745002-80-playwright/runner.log",
+  "artifacts": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/3-browser-run-1792421745002-80-playwright/artifacts"
+}
+
+[2026-10-19T14:55:50.127Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 3,
+  "phase": "review"
+}
+
+[2026-10-19T14:56:44.189Z] 20261019143450543-bfef85b6 — Independent review decision
+{
+  "summary": "Reviewed the full diff, tests, and host browser evidence. All acceptance criteria are supported; no unresolved defects found.",
+  "acceptancePassed": true,
+  "acceptanceEvidence": [
+    "Browser tests confirm collapsed Passed, Failed, and Blocked labels with exact recorded reasons.",
+    "Browser tests confirm both repair decisions display Repair required and recorded failures or findings.",
+    "Incomplete and malformed fixtures remain neutral; successful checks make no whole-iteration verification claim.",
+    "The spec imports the production progressPage and uses test-owned fixtures without executing jobs.",
+    "Targeted render tests passed independently. Host logs confirm lint, typecheck, all 16 suite tests, and build passed; git diff HEAD --check passed."
+  ],
+  "userFacing": true,
+  "browserEvidence": [
+    "Inspected iteration-3.spec.ts and 3-browser-run-1792421745002-80-playwright/results.json: 11 passed, zero skipped, unexpected, or flaky results.",
+    "Coverage includes disclosure, reloads, live updates, mobile overflow, and inert recorded markup.",
+    "Inspected artifacts/.last-run.json: passed with no failed tests. No screenshots or traces were retained under the configured failure-only policy."
+  ],
+  "findings": [],
+  "nextPhase": "commit",
+  "unresolved": []
+}
+
+[2026-10-19T14:56:44.202Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 3,
+  "phase": "commit"
+}
+
+[2026-10-19T14:56:44.205Z] 20261019143450543-bfef85b6 — Verified iteration approved for commit
+{
+  "iteration": 3,
+  "candidate": "Expose verification and review outcomes in collapsed event rows",
+  "summary": "Implemented collapsed verification and review outcomes with visible reasons and repair context. All 28 render tests, lint, typecheck, build, and whitespace checks passed. Evidence: .ralph/20261019143450543-bfef85b6/evidence/outcomes-verification.md. Browser verification and the server-starting full suite remain for the host.",
+  "decision": "Generate five new candidates after this commit",
+  "commitMessage": "ralph: Expose verification and review outcomes in collapsed event rows\n\nRalph-Run: 20261019143450543-bfef85b6\nRalph-Iteration: 3"
+}

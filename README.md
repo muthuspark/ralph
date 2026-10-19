@@ -12,7 +12,14 @@ Throughout the loop, Ralph appends decisions and results to `progress.txt` and
 saves logs and checkpoints in `.ralph/`. Failed baseline checks, exhausted repair
 attempts, or interruptions stop the run with changes preserved for resuming.
 
-## Install locally as a global command
+## Install globally from npm
+
+```sh
+npm install --global @muthuspark/ralph
+ralph --help
+```
+
+To build and install from a local checkout, use the steps below.
 
 Requires Node.js 22+, npm, Git, and an authenticated `codex` or `claude` executable on `PATH`.
 
@@ -39,12 +46,10 @@ For an independent installation you can distribute without the source directory:
 
 ```sh
 npm pack
-npm install --global ./ralph-1.0.1.tgz
+npm install --global ./muthuspark-ralph-1.0.1.tgz
 ```
 
-The package is private to prevent accidental registry publication. Local global
-installation and tarball distribution work normally. `npm link` follows this
-checkout; rebuild with `npm run build` after changing the source.
+`npm link` follows this checkout; rebuild with `npm run build` after changing the source.
 
 ## Run in a project
 
@@ -131,16 +136,16 @@ count. `ralph --help` lists the remaining options.
 The package exports ESM functions and TypeScript declarations:
 
 ```ts
-import { parseOptions, runRalph } from "ralph";
+import { parseOptions, runRalph } from "@muthuspark/ralph";
 
 const options = parseOptions(["--goal", "Improve onboarding", "--iterations", "1"]);
 await runRalph(options, "/absolute/path/to/project");
 ```
 
-Install the tarball as a dependency to import it; a global command installation
+Install the package as a dependency to import it; a global command installation
 does not make the package available to Node imports in unrelated projects.
 `runRalph` accepts an optional third `AbortSignal` argument. Browser report
-validation is exported from `ralph/browser`.
+validation is exported from `@muthuspark/ralph/browser`.
 
 ## Development
 

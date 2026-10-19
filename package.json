@@ -1,6 +1,6 @@
 {
-  "name": "ralph",
-  "version": "1.0.1",
+  "name": "@muthuspark/ralph",
+  "version": "1.0.2",
   "description": "Goal-driven Codex loop with resumable runs and progress.txt tracking",
   "scripts": {
     "ralph": "tsx cli.ts",
@@ -15,7 +15,7 @@
   },
   "keywords": [],
   "author": "",
-  "private": true,
+  "private": false,
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -32,7 +32,7 @@
     "typescript-eslint": "^8.71.2"
   },
   "bin": {
-    "ralph": "./dist/cli.js"
+    "ralph": "dist/cli.js"
   },
   "exports": {
     ".": {

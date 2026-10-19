@@ -1,6 +1,6 @@
 # Ralph
 
-A global CLI and TypeScript library for goal-driven Codex iterations. Ralph ranks
+A global CLI and TypeScript library for goal-driven Codex or Claude iterations. Ralph ranks
 five proposed improvements, implements one, runs checks and browser verification,
 reviews the changes, and commits each verified iteration on a local branch.
 
@@ -14,7 +14,7 @@ attempts, or interruptions stop the run with changes preserved for resuming.
 
 ## Install locally as a global command
 
-Requires Node.js 22+, npm, Git, and an authenticated `codex` executable on `PATH`.
+Requires Node.js 22+, npm, Git, and an authenticated `codex` or `claude` executable on `PATH`.
 
 Install from GitHub:
 
@@ -88,6 +88,7 @@ use `--retry-verification` to accept and fully verify the current edits.
 ```sh
 cd /path/to/project
 ralph --goal "Improve onboarding" --iterations 3 --base-url http://localhost:3000
+ralph --goal "Improve onboarding" --agent claude --iterations 3
 ralph --goal-file requirements.txt --iterations 1
 ralph --resume <run-id>
 ```

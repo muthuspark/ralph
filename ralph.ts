@@ -43,7 +43,7 @@ type Candidate = z.infer<typeof candidateSchema>;
 const phases = ["baseline", "discover", "implement", "verify", "browser-prepare", "browser-run", "review", "repair", "commit", "done"] as const;
 const stateSchema = z.object({
   version: z.literal(1), id: text, root: text, branch: text, head: text, fingerprint: text,
-  goal: text, model: z.string(), iterations: z.number().int().nonnegative(),
+  goal: text, model: z.string(), agent: z.enum(["codex", "claude"]).default("codex"), iterations: z.number().int().nonnegative(),
   maxFixAttempts: z.number().int().nonnegative(), timeoutMinutes: z.number().positive(),
   completed: z.number().int().nonnegative(), phase: z.enum(phases), repairs: z.number().int().nonnegative(),
   candidate: candidateSchema.nullable(), feedback: z.array(z.string()),
@@ -55,7 +55,7 @@ const stateSchema = z.object({
 }).strict();
 type State = z.infer<typeof stateSchema>;
 export type Options = {
-  goal?: string; goalFile?: string; resume?: string; model?: string;
+  goal?: string; goalFile?: string; resume?: string; model?: string; agent?: "codex" | "claude";
   iterations: number; maxFixAttempts: number; timeoutMinutes: number;
   baseUrl?: string; retryVerification?: boolean;
   agentSandbox?: "phase-default" | "danger-full-access";
@@ -67,7 +67,8 @@ ralph --goal-file loop-prd.md --iterations 10
 ralph --resume <run-id>
 
 --iterations N                 Verified commits per run (default 10; 0 = unlimited)
---model MODEL                  Override the configured Codex model
+--model MODEL                  Override the selected CLI's model
+--agent AGENT                  Agent CLI: codex (default) or claude
 --max-fix-attempts N            Repair rounds per iteration (default 3)
 --phase-timeout-minutes N       Timeout per agent/check command (default 30)
 --base-url URL                 Existing app server (default http://localhost:3000)
@@ -100,6 +101,7 @@ export function parseOptions(args: string[]): Options {
       case "--goal-file": options.goalFile = value; break;
       case "--resume": options.resume = value; break;
       case "--model": options.model = value; break;
+      case "--agent": options.agent = z.enum(["codex", "claude"]).parse(value); break;
       case "--agent-sandbox":
         options.agentSandbox = z.enum(["phase-default", "danger-full-access"]).parse(value);
         break;
@@ -119,7 +121,7 @@ export function parseOptions(args: string[]): Options {
     }
   }
   if (options.resume) {
-    if (!/^[a-zA-Z0-9_-]+$/.test(options.resume) || [...seen].some(flag => !["--resume", "--base-url", "--retry-verification", "--agent-sandbox"].includes(flag))) throw new Error("Use --resume RUN-ID alone or with --base-url, --agent-sandbox, and --retry-verification");
+    if (!/^[a-zA-Z0-9_-]+$/.test(options.resume) || [...seen].some(flag => !["--resume", "--base-url", "--retry-verification", "--agent-sandbox", "--agent"].includes(flag))) throw new Error("Use --resume RUN-ID alone or with --base-url, --agent, --agent-sandbox, and --retry-verification");
   } else if (options.retryVerification) {
     throw new Error("--retry-verification requires --resume");
   } else if (Boolean(options.goal) === Boolean(options.goalFile)) {
@@ -259,7 +261,6 @@ export async function runRalph(options: Options, cwd = process.cwd(), signal?: A
     await atomicJson(path.join(dir, "state.json"), state);
   };
   try {
-    await command("codex", ["--version"], root, { signal });
     if (options.resume) {
       dir = path.join(root, ".ralph", options.resume);
       state = stateSchema.parse(JSON.parse(await readFile(path.join(dir, "state.json"), "utf8")));
@@ -288,6 +289,7 @@ export async function runRalph(options: Options, cwd = process.cwd(), signal?: A
         if (state.phase === "review" || state.phase === "commit") state.phase = "browser-prepare";
       }
       if (options.agentSandbox) state.agentSandbox = options.agentSandbox;
+      if (options.agent) state.agent = options.agent;
       active = true;
     } else {
       if (await git(root, "status", "--porcelain", "--untracked-files=all")) throw new Error("Start requires a clean Git tree. Commit or move existing changes first; Ralph never stashes them.");
@@ -298,7 +300,7 @@ export async function runRalph(options: Options, cwd = process.cwd(), signal?: A
       await mkdir(dir);
       state = {
         version: 1, id, root, branch: `ralph/${id}`, head: await git(root, "rev-parse", "HEAD"),
-        fingerprint: "", goal, model: options.model ?? "", iterations: options.iterations,
+        fingerprint: "", goal, model: options.model ?? "", agent: options.agent ?? "codex", iterations: options.iterations,
         maxFixAttempts: options.maxFixAttempts, timeoutMinutes: options.timeoutMinutes,
         completed: 0, phase: "baseline", repairs: 0, candidate: null, feedback: [], history: [], summary: "", lastError: "",
         baseUrl: options.baseUrl ?? "http://localhost:3000", browserResult: null,
@@ -311,6 +313,7 @@ export async function runRalph(options: Options, cwd = process.cwd(), signal?: A
       await save();
     }
     const s = state;
+    await command(s.agent, ["--version"], root, { signal });
     const verification = await resolveVerification(root);
     console.log(`Verification: ${verification.checks.map(check => check.name).join(", ")}; browser ${verification.browser ? "enabled" : "disabled"}`);
     console.log(`Ralph ${s.id}: ${s.branch}\nResume: ralph --resume ${s.id}`);
@@ -335,9 +338,22 @@ export async function runRalph(options: Options, cwd = process.cwd(), signal?: A
       await writeFile(artifact("prompt.txt"), input);
       const before = await fingerprint(root);
       const sandbox = s.agentSandbox === "danger-full-access" ? "danger-full-access" : writable ? "workspace-write" : "read-only";
-      await command("codex", ["--ask-for-approval", "never", "exec", "--ephemeral", "--sandbox", sandbox,
-        "--cd", root, "--json", "--output-schema", schemaFile, "--output-last-message", output,
-        ...(s.model ? ["--model", s.model] : []), "-"], root, { input, log, timeoutMs, signal });
+      if (s.agent === "codex") {
+        await command(s.agent, ["--ask-for-approval", "never", "exec", "--ephemeral", "--sandbox", sandbox,
+          "--cd", root, "--json", "--output-schema", schemaFile, "--output-last-message", output,
+          ...(s.model ? ["--model", s.model] : []), "-"], root, { input, log, timeoutMs, signal });
+      } else {
+        const result = await command(s.agent, ["--print", "--output-format", "json", "--permission-mode", writable ? "acceptEdits" : "plan",
+          ...(s.model ? ["--model", s.model] : [])], root, {
+          input: `${input}\n\nReturn only a JSON object matching this JSON Schema:\n${await readFile(schemaFile, "utf8")}`,
+          log, timeoutMs, signal,
+        });
+        const response = JSON.parse(result) as { result?: string };
+        if (typeof response.result !== "string") throw new Error("Claude CLI returned no result text");
+        const json = response.result.match(/\{[\s\S]*\}/)?.[0];
+        if (!json) throw new Error("Claude CLI did not return a JSON phase result");
+        await writeFile(output, json);
+      }
       await assertHead();
       if (!writable && before !== await fingerprint(root)) throw new Error("Read-only phase modified repository files");
       return schema.parse(JSON.parse(await readFile(output, "utf8")));

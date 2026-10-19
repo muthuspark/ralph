@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { parseOptions, rankCandidates } from "./ralph.js";
 import { assessBrowserReport } from "./ralph-browser.js";
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, writeFile, readFile, readdir, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, readdir, rm, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -15,9 +15,12 @@ const exec = promisify(execFile);
 
 test("CLI accepts a goal and validates conflicting or unsafe options", () => {
   assert.equal(parseOptions(["--goal", "Improve onboarding"]).iterations, 10);
+  assert.equal(parseOptions(["--goal", "Improve onboarding", "--agent", "claude"]).agent, "claude");
   assert.equal(parseOptions(["--resume", "run-1", "--retry-verification"]).retryVerification, true);
+  assert.equal(parseOptions(["--resume", "run-1", "--agent", "claude"]).agent, "claude");
   for (const args of [[], ["--goal", "one", "--goal-file", "two"], ["--resume", "../run"],
-    ["--goal", "one", "--iterations", "-1"], ["--goal", "one", "--goal", "two"]]) {
+    ["--goal", "one", "--iterations", "-1"], ["--goal", "one", "--goal", "two"],
+    ["--goal", "one", "--agent", "unknown"]]) {
     assert.throws(() => parseOptions(args));
   }
 });
@@ -63,7 +66,9 @@ test("CLI records failed checks and resumes in the target repository without los
   try {
     const bin = path.join(root, "bin");
     await mkdir(bin);
-    await writeFile(path.join(bin, "codex"), '#!/usr/bin/env node\nprocess.exit(process.argv[2] === "--version" ? 0 : 99);\n', { mode: 0o755 });
+    for (const agent of ["codex", "claude"]) {
+      await writeFile(path.join(bin, agent), '#!/usr/bin/env node\nprocess.exit(process.argv[2] === "--version" ? 0 : 99);\n', { mode: 0o755 });
+    }
     await writeFile(path.join(root, ".gitignore"), ".ralph/\n");
     await writeFile(path.join(root, "package.json"), JSON.stringify({ scripts: {
       lint: 'node -e "process.exit(1)"', typecheck: 'node -e "process.exit(0)"',
@@ -78,14 +83,15 @@ test("CLI records failed checks and resumes in the target repository without los
     const run = (args: string[]) => exec(process.execPath, [tsx, cli, ...args], {
       cwd: root, env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` },
     });
-    await assert.rejects(run(["--goal", "Improve test project", "--iterations", "1"]), /Baseline checks failed/);
+    await assert.rejects(run(["--goal", "Improve test project", "--agent", "claude", "--iterations", "1"]), /Baseline checks failed/);
     const progress = await readFile(path.join(root, "progress.txt"), "utf8");
     for (const event of ["Run started", "Phase started", "Check failed", "Check passed", "Run stopped; changes preserved"]) {
       assert.ok(progress.includes(event), `Missing event: ${event}`);
     }
     const [id] = await readdir(path.join(root, ".ralph"));
     const state = JSON.parse(await readFile(path.join(root, ".ralph", id, "state.json"), "utf8"));
-    assert.equal(state.root, root);
+    assert.equal(state.root, await realpath(root));
+    assert.equal(state.agent, "claude");
     assert.equal(state.phase, "baseline");
     await assert.rejects(run(["--resume", id]), /Baseline checks failed/);
     const resumed = await readFile(path.join(root, "progress.txt"), "utf8");

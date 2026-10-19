@@ -1,0 +1,56 @@
+{
+  "name": "ralph",
+  "version": "1.0.0",
+  "description": "Goal-driven Codex loop with resumable runs and progress.txt tracking",
+  "scripts": {
+    "ralph": "tsx cli.ts",
+    "start": "npm run ralph --",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test *.test.ts",
+    "build": "tsc",
+    "test:e2e:ralph": "playwright test --config playwright.ralph.config.ts",
+    "prepack": "npm run build",
+    "prepare": "npm run build"
+  },
+  "keywords": [],
+  "author": "",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "zod": "^4.6.7",
+    "@playwright/test": "^1.64.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "eslint": "^10.13.0",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.2"
+  },
+  "bin": {
+    "ralph": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/ralph.d.ts",
+      "import": "./dist/ralph.js"
+    },
+    "./browser": {
+      "types": "./dist/ralph-browser.d.ts",
+      "import": "./dist/ralph-browser.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/muthuspark/ralph.git"
+  }
+}

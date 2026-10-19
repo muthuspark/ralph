@@ -65,6 +65,9 @@ Before the first run:
 For Node projects, provide working `lint`, `typecheck`, `test`, and `build` npm
 scripts. Browser verification is enabled by default: install `@playwright/test`
 and Chromium in the project and start the app separately using test-owned data.
+Ralph uses the project's Playwright installation for browser verification, including
+when Ralph itself is installed globally. If it is missing, install it with
+`npm install --save-dev @playwright/test` and run `npx playwright install chromium`.
 
 For Python projects with `pyproject.toml` and no `package.json`, Ralph checks
 Python syntax and runs unittest tests. It uses `uv run --locked python` when a

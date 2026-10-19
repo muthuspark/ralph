@@ -4,6 +4,7 @@ Notable changes to this project are recorded here.
 
 ## Unreleased
 
+- Fixed browser verification for global installations by using the target project's Playwright runner and avoiding a second Playwright import in Ralph's config. Added isolated-install regression coverage and actionable missing-dependency errors; bumped the package version to `1.0.4`.
 - Added `ralph --version` to print the installed package version and exit; bumped the package version to `1.0.3`.
 - Bumped the package version to `1.0.2` and updated npm publication metadata and documentation.
 - Prepared the project for npm publication as `@muthuspark/ralph`.

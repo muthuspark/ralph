@@ -5,9 +5,8 @@ import { hostname } from "node:os";
 import { mkdir, readFile, writeFile, appendFile, rename, unlink, lstat, readlink } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
 import { z } from "zod";
-import { assessBrowserReport } from "./ralph-browser.js";
+import { assessBrowserReport, resolvePlaywrightCli } from "./ralph-browser.js";
 import { resolveVerification } from "./ralph-project.js";
 
 const text = z.string().trim().min(1);
@@ -460,6 +459,7 @@ export async function runRalph(options: Options, cwd = process.cwd(), signal?: A
         }
         case "browser-run": {
           s.browserResult = null;
+          const playwrightCli = resolvePlaywrightCli(root);
           try {
             const response = await fetch(s.baseUrl, { signal: AbortSignal.any([AbortSignal.timeout(5000), ...(signal ? [signal] : [])]) });
             await response.body?.cancel();
@@ -471,7 +471,7 @@ export async function runRalph(options: Options, cwd = process.cwd(), signal?: A
           const report = path.join(output, "results.json");
           let failure: unknown;
           try {
-            await command(process.execPath, [createRequire(import.meta.url).resolve("@playwright/test/cli"), "test", "--config", fileURLToPath(new URL(import.meta.url.endsWith(".ts") ? "./playwright.ralph.config.ts" : "./playwright.ralph.config.js", import.meta.url)), browserSpec()], root, { log, timeoutMs, signal, env: { RALPH_BASE_URL: s.baseUrl, RALPH_BROWSER_OUTPUT: output } });
+            await command(process.execPath, [playwrightCli, "test", "--config", fileURLToPath(new URL(import.meta.url.endsWith(".ts") ? "./playwright.ralph.config.ts" : "./playwright.ralph.config.js", import.meta.url)), browserSpec()], root, { log, timeoutMs, signal, env: { RALPH_BASE_URL: s.baseUrl, RALPH_BROWSER_OUTPUT: output } });
           } catch (error) { if (signal?.aborted) throw error; failure = error; }
           await assertHead();
           let result;

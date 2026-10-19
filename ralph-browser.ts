@@ -1,4 +1,14 @@
 import { z } from "zod";
+import { createRequire } from "node:module";
+import path from "node:path";
+
+export function resolvePlaywrightCli(root: string): string {
+  try {
+    return createRequire(path.join(root, "package.json")).resolve("@playwright/test/cli");
+  } catch (error) {
+    throw new Error(`Browser verification blocked: cannot resolve @playwright/test from ${root}. Install it in the target project (npm install --save-dev @playwright/test), then resume; no repair attempt was consumed.`, { cause: error });
+  }
+}
 
 const testSchema = z.object({
   status: z.enum(["expected", "unexpected", "flaky", "skipped"]),

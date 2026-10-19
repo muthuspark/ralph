@@ -1,9 +1,10 @@
-import { defineConfig } from "@playwright/test";
+import type { PlaywrightTestConfig } from "@playwright/test";
 import path from "node:path";
 
 const output = process.env.RALPH_BROWSER_OUTPUT ?? path.resolve(".ralph", "browser");
 
-export default defineConfig({
+// Keep this config free of runtime Playwright imports: the target project owns the runner.
+export default {
   testDir: path.resolve("e2e/ralph"),
   fullyParallel: false,
   workers: 1,
@@ -17,4 +18,4 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-});
+} satisfies PlaywrightTestConfig;

@@ -64,6 +64,9 @@ export const help = `Goal-driven Ralph loop (Codex CLI)
 ralph --goal "Improve learner retention"
 ralph --goal-file loop-prd.md --iterations 10
 ralph --resume <run-id>
+ralph server [--port 4317] [--no-open]
+
+server                         Live browser view of progress.txt in the current directory
 
 --iterations N                 Verified commits per run (default 10; 0 = unlimited)
 --model MODEL                  Override the selected CLI's model

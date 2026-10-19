@@ -54,6 +54,24 @@ npm install --global ./muthuspark-ralph-1.0.1.tgz
 
 ## Run in a project
 
+### Watch live progress
+
+In a second terminal, run this from the directory containing `progress.txt`:
+
+```sh
+ralph server
+```
+
+This opens `http://127.0.0.1:4317` in your browser with a live event timeline,
+run and text filters, expandable details, and the raw log. The page updates every
+second and waits for the file if it does not exist yet. The viewer only reads the
+current directory's `progress.txt`; it does not start or resume a Ralph run.
+
+Use `ralph server --port 8080` to choose another port, or add `--no-open` to print
+the URL without opening a browser. Press Ctrl+C to stop the server.
+
+### Start a run
+
 Ralph operates on the Git repository containing your current directory. It stores
 `progress.txt` and `.ralph/` at that repository's root, independently for each project.
 

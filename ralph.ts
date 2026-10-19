@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { z } from "zod";
 import { assessBrowserReport } from "./ralph-browser.js";
+import { resolveVerification } from "./ralph-project.js";
 
 const text = z.string().trim().min(1);
 const mustDoAssessmentSchema = z.object({
@@ -78,6 +79,8 @@ Runs in the current Git repository; requires a clean tree on first start.
 Creates a local ralph/<run-id> branch. Add .ralph/ to the project's .gitignore.
 Decisions: progress.txt (appended and included in verified commits).
 Logs and resumable state: .ralph/<run-id>/. Never pushes, merges, or deploys.
+Checks: npm scripts for Node, Python syntax/tests for Python projects.
+Customize commands and browser verification with ralph.config.json.
 Discovery: a senior product manager and domain subject matter expert assess five
 must-do improvements. Highest combined must-do score wins; value/cost breaks ties.
 `;
@@ -232,8 +235,8 @@ async function acquireLock(root: string) {
 
 const instructions = `Work only toward the supplied goal and selected increment. Follow AGENTS.md and applicable skills; use Semble first for code exploration. Read relevant installed Next.js guides before changing Next.js code.
 Do not delegate or spawn other agents. Do not commit, switch branches, push, merge, deploy, delete user data, or change Git configuration. The orchestrator owns Git operations.
-Do not edit progress.txt, Ralph state, prompts, schemas, logs, the Ralph orchestrator/tests, or package check commands. The orchestrator owns progress.txt; read it for prior decisions if useful. You may create browser/test evidence files under .ralph only. Do not weaken checks to make them pass. Do not read secrets. Stop with a concrete blocker if required permissions or services are unavailable.
-The host orchestrator runs Playwright against the existing app server. Do not launch a server or browser inside this sandbox. Browser tests belong in e2e/ralph/<run-id>/; the separate browser-prepare phase writes them and the host records actual results. Do not alter playwright.ralph.config.ts. Do not modify or delete existing learner data; use only test-owned fixtures and clean them up.
+Do not edit progress.txt, Ralph state, prompts, schemas, logs, ralph.config.json, the Ralph orchestrator/tests, or package check commands. The orchestrator owns progress.txt; read it for prior decisions if useful. You may create browser/test evidence files under .ralph only. Do not weaken checks to make them pass. Do not read secrets. Stop with a concrete blocker if required permissions or services are unavailable.
+When verification.browser is true, the host orchestrator runs Playwright against the existing app server. Do not launch a server or browser inside this sandbox. Browser tests belong in e2e/ralph/<run-id>/; the separate browser-prepare phase writes them and the host records actual results. When verification.browser is false, validate CLI or library behavior using meaningful automated tests; no app server or browser spec is required. Do not alter playwright.ralph.config.ts. Do not modify or delete existing user data; use only test-owned fixtures and clean them up.
 Derive browser locators from the rendered source and existing verified tests. Exact accessible names include visible symbols such as arrows; do not guess labels or increase timeouts to hide selector mismatches.
 Scope alert and status locators to the page's main content or specific expected text: Next.js also renders a global route announcer with an alert role. Do not assert that the entire page has zero alerts after recovery.
 Use existing test fixtures where available. Validate real changed behavior without starting paid generation jobs or altering user data.
@@ -308,6 +311,8 @@ export async function runRalph(options: Options, cwd = process.cwd(), signal?: A
       await save();
     }
     const s = state;
+    const verification = await resolveVerification(root);
+    console.log(`Verification: ${verification.checks.map(check => check.name).join(", ")}; browser ${verification.browser ? "enabled" : "disabled"}`);
     console.log(`Ralph ${s.id}: ${s.branch}\nResume: ralph --resume ${s.id}`);
     if (options.resume && s.phase !== "done") {
       await record("Run resumed", { phase: s.phase, completed: s.completed, repairs: s.repairs, previousError: s.lastError, baseUrl: s.baseUrl, agentSandbox: s.agentSandbox, reverifyCurrentEdits: Boolean(options.retryVerification), note: options.retryVerification ? "Current working tree explicitly accepted for full verification; repair count preserved; previous state backed up" : "Resume checkpoint" });
@@ -325,7 +330,7 @@ export async function runRalph(options: Options, cwd = process.cwd(), signal?: A
       const schemaFile = artifact("schema.json"), output = artifact("result.json"), log = artifact("events.jsonl");
       await writeFile(schemaFile, JSON.stringify(z.toJSONSchema(wireSchema)));
       const input = `${instructions}\n\nPHASE: ${s.phase}\nTASK DATA (JSON):\n${JSON.stringify({
-        goal: s.goal, runDirectory: dir, completed: s.completed, history: s.history, candidate: s.candidate, feedback: s.feedback, baseUrl: s.baseUrl, browserSpec: browserSpec(), browserResult: s.browserResult,
+        goal: s.goal, runDirectory: dir, completed: s.completed, history: s.history, candidate: s.candidate, feedback: s.feedback, baseUrl: s.baseUrl, browserSpec: browserSpec(), browserResult: s.browserResult, verification,
       })}\n\n${prompt}`;
       await writeFile(artifact("prompt.txt"), input);
       const before = await fingerprint(root);
@@ -337,20 +342,32 @@ export async function runRalph(options: Options, cwd = process.cwd(), signal?: A
       if (!writable && before !== await fingerprint(root)) throw new Error("Read-only phase modified repository files");
       return schema.parse(JSON.parse(await readFile(output, "utf8")));
     };
-    const checks = async (scripts = ["lint", "typecheck", "test", "build"]) => {
+    const checks = async (scripts?: string[]) => {
       const failures: string[] = [];
-      for (const script of scripts) {
+      let plan;
+      try { plan = await resolveVerification(root, s.phase !== "baseline"); }
+      catch (error) {
+        await record("Check configuration failed", { error: String(error) });
+        return [String(error)];
+      }
+      for (const note of plan.notes) {
+        console.log(`  ${note}`);
+        await record("Verification limitation", { note });
+      }
+      for (const check of plan.checks.filter(check => !scripts || scripts.includes(check.name))) {
         signal?.throwIfAborted();
-        const log = artifact(`${script}.log`);
-        console.log(`  npm run ${script}`);
+        const log = artifact(`${check.name}.log`);
+        const [bin, ...args] = check.command;
+        const display = check.command.join(" ");
+        console.log(`  ${display}`);
         try {
-          await command("npm", ["run", script], root, { log, timeoutMs, signal });
-          await record("Check passed", { iteration: s.completed + 1, phase: s.phase, command: `npm run ${script}`, log });
+          await command(bin, args, root, { log, timeoutMs, signal, env: { PYTHONPYCACHEPREFIX: path.join(root, ".ralph", "pycache") } });
+          await record("Check passed", { iteration: s.completed + 1, phase: s.phase, command: display, log });
         }
         catch (error) {
           if (signal?.aborted) throw error;
           failures.push(String(error));
-          await record("Check failed", { iteration: s.completed + 1, phase: s.phase, command: `npm run ${script}`, error: String(error), log });
+          await record("Check failed", { iteration: s.completed + 1, phase: s.phase, command: display, error: String(error), log });
         }
         await assertHead();
       }
@@ -401,7 +418,7 @@ export async function runRalph(options: Options, cwd = process.cwd(), signal?: A
           catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
           // Re-run existing coverage, including manual fixes, without regenerating it.
           // The reviewer still checks whether it covers the selected increment.
-          s.phase = failures.length ? "repair" : hasSpec ? "browser-run" : "browser-prepare";
+          s.phase = failures.length ? "repair" : !verification.browser ? "review" : hasSpec ? "browser-run" : "browser-prepare";
           await record("Verification decision", { nextPhase: s.phase, failures });
           break;
         }
@@ -446,11 +463,14 @@ export async function runRalph(options: Options, cwd = process.cwd(), signal?: A
           break;
         }
         case "review": {
-          if (!s.browserResult) { s.phase = "browser-prepare"; break; }
-          const result = await agent(reviewSchema, `Independently inspect the full diff against HEAD, tests, and selected acceptance criteria. Check correctness, regressions, accessibility, data compatibility, and unsupported claims. The host has already executed Playwright outside this sandbox. Inspect browserResult.report, browserResult.artifacts, and the spec; do not launch a server or browser here. Decide whether those actual tests cover the changed user-facing flows and acceptance criteria. Missing coverage is a concrete finding; environment limitations of this review session are not evidence that the host tests failed. Acceptance evidence must substantiate each criterion. Return all concrete unresolved defects in findings; an empty list means none found. Implementation report: ${JSON.stringify(s.summary)}`, false);
+          if (verification.browser && !s.browserResult) { s.phase = "browser-prepare"; break; }
+          const reviewInstructions = verification.browser
+            ? "The host has already executed Playwright outside this sandbox. Inspect browserResult.report, browserResult.artifacts, and the spec; do not launch a server or browser here. Decide whether those actual tests cover the changed user-facing flows and acceptance criteria."
+            : "Browser verification is disabled for this project. Inspect and run meaningful CLI/library tests, with external services mocked at the process boundary when appropriate. Do not require a web server, Playwright spec, or browser evidence for non-browser changes. If the increment introduces browser behavior, report the missing browser verification as a finding.";
+          const result = await agent(reviewSchema, `Independently inspect the full diff against HEAD, tests, and selected acceptance criteria. Check correctness, regressions, accessibility, data compatibility, and unsupported claims. ${reviewInstructions} Missing coverage is a concrete finding. Acceptance evidence must substantiate each criterion. Return all concrete unresolved defects in findings; an empty list means none found. Implementation report: ${JSON.stringify(s.summary)}`, false);
           s.feedback = [...result.findings];
           if (!result.acceptancePassed || !result.acceptanceEvidence.length) s.feedback.push("Acceptance criteria lack passing evidence");
-          if (result.userFacing && !result.browserEvidence.length) s.feedback.push("Required browser evidence is missing");
+          if (verification.browser && result.userFacing && !result.browserEvidence.length) s.feedback.push("Required browser evidence is missing");
           s.phase = s.feedback.length ? "repair" : "commit";
           await record("Independent review decision", { ...result, nextPhase: s.phase, unresolved: s.feedback });
           break;

@@ -8,10 +8,14 @@ reviews the changes, and commits each verified iteration on a local branch.
 
 Requires Node.js 22+, npm, Git, and an authenticated `codex` executable on `PATH`.
 
-Install directly from GitHub:
+Install from GitHub:
 
 ```sh
-npm install --global git+https://github.com/muthuspark/ralph.git
+git clone https://github.com/muthuspark/ralph.git
+cd ralph
+npm install
+npm pack
+npm install --global ./ralph-*.tgz
 ralph --help
 ```
 
@@ -27,7 +31,7 @@ For an independent installation you can distribute without the source directory:
 
 ```sh
 npm pack
-npm install --global ./ralph-1.0.0.tgz
+npm install --global ./ralph-1.0.1.tgz
 ```
 
 The package is private to prevent accidental registry publication. Local global
@@ -42,12 +46,36 @@ Ralph operates on the Git repository containing your current directory. It store
 Before the first run:
 
 - Add `.ralph/` to the project's `.gitignore` and commit it.
-- Provide working `lint`, `typecheck`, `test`, and `build` npm scripts.
-- Install `@playwright/test` as a dev dependency in the project so its generated
-  browser specs can import it. Match the version used by Ralph when possible.
-- Install Chromium with `npx playwright install chromium` in the project.
-- Start the app separately, using test-owned data for acceptance checks.
 - Commit existing changes. Ralph requires a clean tree and an initial Git commit.
+
+For Node projects, provide working `lint`, `typecheck`, `test`, and `build` npm
+scripts. Browser verification is enabled by default: install `@playwright/test`
+and Chromium in the project and start the app separately using test-owned data.
+
+For Python projects with `pyproject.toml` and no `package.json`, Ralph checks
+Python syntax and runs unittest tests. It uses `uv run --locked python` when a
+`uv.lock` exists, otherwise `python3`. Projects declaring pytest use pytest
+instead. Python projects default to browser verification disabled. If no tests
+exist, baseline records that limitation; implementation must add tests before
+verification and commit. Python bytecode caches live under `.ralph/pycache/`.
+
+For other projects, mixed repositories, CLI-only Node projects, or custom checks,
+add and commit `ralph.config.json` before starting a run:
+
+```json
+{
+  "checks": [
+    { "name": "test", "command": ["uv", "run", "--locked", "python", "-m", "unittest", "discover", "-s", "tests"] }
+  ],
+  "browser": false
+}
+```
+
+Commands are executable/argument arrays, run from the target repository root
+without a shell. Every command must pass; use real checks appropriate to the
+project. Explicit configuration overrides automatic detection. Agents are
+instructed not to change check configuration. To change it during a stopped run,
+use `--retry-verification` to accept and fully verify the current edits.
 
 ```sh
 cd /path/to/project
@@ -57,7 +85,8 @@ ralph --resume <run-id>
 ```
 
 The default limit is ten verified commits; `--iterations 0` runs without a limit.
-The app must remain available at `--base-url` (default `http://localhost:3000`).
+When browser verification is enabled, the app must remain available at `--base-url`
+(default `http://localhost:3000`).
 Ralph uses its bundled Playwright runner and configuration; the project does not
 need a `test:e2e:ralph` npm script or a `playwright.ralph.config.ts` file.
 Generated specs live under `e2e/ralph/<run-id>/` in the project.

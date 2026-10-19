@@ -1,6 +1,6 @@
 {
   "name": "ralph",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Goal-driven Codex loop with resumable runs and progress.txt tracking",
   "scripts": {
     "ralph": "tsx cli.ts",

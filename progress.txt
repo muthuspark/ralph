@@ -9,3 +9,9 @@ Global ralph CLI and ESM library configured. Added browser-report validation, bu
 Playwright configuration, and target-repository progress/resume coverage.
 Verified: lint, TypeScript check, 6 tests, build, npm pack dry run, npm link, ralph --help.
 A live Codex implementation loop and live application browser checks were not run.
+
+[2026-10-19T03:43:11.124Z] Python project verification support (1.0.1)
+Detected the reported baseline failure: npm check commands were being run in a Python project.
+Added Python syntax and test detection, uv support, non-browser verification, and explicit
+ralph.config.json command arrays. Baseline records missing tests; verification requires tests.
+Verified: lint, TypeScript check, 8 tests (including a complete mocked Python loop), build.

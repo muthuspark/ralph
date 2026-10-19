@@ -1,0 +1,38 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "fontSize": "16px",
+    "primaryColor": "#e8f1ff",
+    "primaryTextColor": "#14213d",
+    "primaryBorderColor": "#4f7cff",
+    "lineColor": "#7182a6",
+    "secondaryColor": "#fff5dd",
+    "tertiaryColor": "#eefbf6"
+  }
+}}%%
+flowchart TD
+    Goal[Your goal] --> Baseline[Check the existing project]
+    Baseline --> Choose[Propose five improvements and pick one]
+    Choose --> Implement[Codex implements the improvement]
+    Implement --> Verify[Run checks, optional browser tests, and review]
+    Verify -->|Issues found| Repair[Codex repairs the changes]
+    Repair --> Verify
+    Verify -->|Passed| Commit[Commit changes and progress.txt]
+    Commit --> Limit{Iteration limit reached?}
+    Limit -->|No| Choose
+    Limit -->|Yes| Done[Done]
+
+    classDef start fill:#14213d,color:#ffffff,stroke:#14213d,stroke-width:2px
+    classDef process fill:#e8f1ff,color:#14213d,stroke:#4f7cff,stroke-width:2px
+    classDef verify fill:#eefbf6,color:#124936,stroke:#28a778,stroke-width:2px
+    classDef repair fill:#fff5dd,color:#60420c,stroke:#e6a323,stroke-width:2px
+    classDef decision fill:#f4edff,color:#3d236b,stroke:#9a6ee8,stroke-width:2px
+    classDef done fill:#14213d,color:#ffffff,stroke:#14213d,stroke-width:2px
+
+    class Goal start
+    class Baseline,Choose,Implement process
+    class Verify verify
+    class Repair repair
+    class Commit,Limit decision
+    class Done done

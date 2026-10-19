@@ -6,19 +6,7 @@ reviews the changes, and commits each verified iteration on a local branch.
 
 ## How it works
 
-```mermaid
-flowchart TD
-    Goal[Your goal] --> Baseline[Check the existing project]
-    Baseline --> Choose[Propose five improvements and pick one]
-    Choose --> Implement[Codex implements the improvement]
-    Implement --> Verify[Run checks, optional browser tests, and review]
-    Verify -->|Issues found| Repair[Codex repairs the changes]
-    Repair --> Verify
-    Verify -->|Passed| Commit[Commit changes and progress.txt]
-    Commit --> Limit{Iteration limit reached?}
-    Limit -->|No| Choose
-    Limit -->|Yes| Done[Done]
-```
+![Ralph's goal-driven iteration loop](docs/ralph-flow.svg)
 
 Throughout the loop, Ralph appends decisions and results to `progress.txt` and
 saves logs and checkpoints in `.ralph/`. Failed baseline checks, exhausted repair

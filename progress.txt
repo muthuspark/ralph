@@ -75,3 +75,571 @@ Verified: lint, TypeScript check, 8 tests (including a complete mocked Python lo
   "error": "Error: Baseline checks failed. Fix the environment or repository before starting a new run.\nError: npm run exited 1. See /Users/muthukrishnan.thukkaram/code/misc/ralph/.ralph/20261019044626381-209d25d4/1-baseline-1792385190603-2-test.log",
   "resume": "ralph --resume 20261019044626381-209d25d4"
 }
+
+[2026-10-19T14:34:50.549Z] 20261019143450543-bfef85b6 — Run started
+{
+  "goal": "improve the overall usability of the html viewer",
+  "branch": "ralph/20261019143450543-bfef85b6",
+  "iterations": 5,
+  "model": "Codex configured default",
+  "maxFixAttempts": 3,
+  "timeoutMinutes": 30,
+  "baseUrl": "http://localhost:3000",
+  "agentSandbox": "phase-default"
+}
+
+[2026-10-19T14:34:50.564Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 1,
+  "phase": "baseline"
+}
+
+[2026-10-19T14:34:51.352Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 1,
+  "phase": "baseline",
+  "command": "npm run lint",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/1-baseline-1792420490564-0-lint.log"
+}
+
+[2026-10-19T14:34:53.214Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 1,
+  "phase": "baseline",
+  "command": "npm run typecheck",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/1-baseline-1792420491357-1-typecheck.log"
+}
+
+[2026-10-19T14:34:57.947Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 1,
+  "phase": "baseline",
+  "command": "npm run test",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/1-baseline-1792420493221-2-test.log"
+}
+
+[2026-10-19T14:34:59.556Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 1,
+  "phase": "baseline",
+  "command": "npm run build",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/1-baseline-1792420497951-3-build.log"
+}
+
+[2026-10-19T14:34:59.572Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 1,
+  "phase": "discover"
+}
+
+[2026-10-19T14:37:11.346Z] 20261019143450543-bfef85b6 — Five candidates generated and ranked
+{
+  "formula": "mustDo.productManager.score + mustDo.subjectMatterExpert.score",
+  "tieBreaker": "impact * confidence / (effort * risk), higher impact, lower effort, proposal order",
+  "ranked": [
+    {
+      "title": "Show stopped-run reasons and resume instructions above the timeline",
+      "category": "Recovery and run comprehension",
+      "rationale": "Give the selected run a concise stopped-state summary containing its recorded error, pending phase, and resume command. The product domain is developer workflow observability for autonomous coding. Learner needs here mean helping operators understand the workflow and its evidence; the repository does not establish an educational product. Faster recovery is a hypothesis, not a measured result. Scope this increment to presenting existing log data without executing commands.",
+      "evidence": [
+        "ralph-server-page.ts:62-72 displays the stopped phase and latest event, but omits the recorded error and resume instructions from the summary.",
+        "ralph-server-page.ts:44 does not include resume instructions in event previews; full recovery information requires expanding the stopped event.",
+        "ralph.ts:543 records error, pendingPhase, repairs, and resume in 'Run stopped; changes preserved'.",
+        "README.md:10-12 explains that failed checks, exhausted repairs, and interruptions stop runs with changes preserved for resuming. Findings are from source inspection; no browser checks were executed."
+      ],
+      "acceptanceCriteria": [
+        "Given a selected run ending with 'Run stopped; changes preserved', main content visibly presents its error, pending phase, and exact recorded resume command without expanding an event.",
+        "Switching runs updates the recovery summary without leaking another run's error or command.",
+        "A subsequent 'Run resumed' or 'Phase started' event clears the obsolete stopped summary.",
+        "Missing recovery fields are handled without undefined text, and log values render as inert text.",
+        "Host browser verification uses test-owned API fixtures for stopped, resumed, and multiple-run cases; the viewer never starts or resumes a run."
+      ],
+      "impact": 5,
+      "confidence": 5,
+      "effort": 2,
+      "risk": 2,
+      "mustDo": {
+        "productManager": {
+          "score": 4,
+          "rationale": "An interrupted operator needs to understand what prevented progress and how to continue. Hiding that information behind event expansion significantly impedes recovery from an explicitly supported workflow."
+        },
+        "subjectMatterExpert": {
+          "score": 4,
+          "rationale": "A monitoring surface should make recorded intervention requirements immediately understandable. Showing the recorded recovery instructions teaches the correct continuation path while avoiding unsupported claims about completion or automatic recovery.",
+          "domain": "Developer workflow observability and autonomous coding run recovery"
+        }
+      },
+      "index": 0,
+      "score": 6.25,
+      "mustDoScore": 8
+    },
+    {
+      "title": "Label structured verification outcomes explicitly",
+      "category": "Verification evidence comprehension",
+      "rationale": "Add textual outcome labels and concise reasons to Host Playwright verification events using their structured status fields. Limit the first slice to this event family and retain full expandable evidence. The expected benefit is more reliable interpretation of acceptance results; no user error rate has been measured.",
+      "evidence": [
+        "ralph-server-page.ts:80-81 styles outcomes solely by matching failed, stopped, passed, or approved in event titles.",
+        "ralph.ts:483 records every browser outcome under the identical title 'Host Playwright verification'.",
+        "ralph.ts:484-489 distinguishes structured status values blocked and failed, while the viewer's preview at ralph-server-page.ts:44 does not inspect status or reason.",
+        "ralph-server-page.ts:90-91 exposes these structured fields only in expanded generic details."
+      ],
+      "acceptanceCriteria": [
+        "Host Playwright verification fixtures with passed, failed, and blocked statuses show distinct visible textual outcomes in collapsed event summaries.",
+        "Failed and blocked summaries show their recorded reason without requiring expansion.",
+        "Unknown or missing status is shown neutrally and is never inferred as passed.",
+        "Outcome meaning remains understandable without color, and full report, log, and artifact details remain available.",
+        "Host browser verification confirms all supported statuses using test-owned fixtures without running generation jobs."
+      ],
+      "impact": 4,
+      "confidence": 5,
+      "effort": 2,
+      "risk": 2,
+      "mustDo": {
+        "productManager": {
+          "score": 3,
+          "rationale": "Operators need to distinguish acceptance failure from an unavailable verification environment. This is important for deciding what needs attention, although detailed evidence is already accessible."
+        },
+        "subjectMatterExpert": {
+          "score": 4,
+          "rationale": "Passed, failed, and blocked have materially different meanings. Collapsing them into the same event presentation makes the verification process harder to learn and invites incorrect conclusions about whether changed behavior was actually tested.",
+          "domain": "Developer workflow observability and software verification evidence"
+        }
+      },
+      "index": 1,
+      "score": 5,
+      "mustDoScore": 7
+    },
+    {
+      "title": "Preserve the event being read when live updates arrive",
+      "category": "Live reading continuity and accessibility",
+      "rationale": "Keep existing event DOM nodes stable during append-only refreshes so operators can read and select detailed evidence without disruption. Preserve expansion, keyboard focus, and the visible reading position. Scope replacement behavior separately when the underlying log is replaced. The disruption risk follows from the implementation; its frequency has not been measured in a browser.",
+      "evidence": [
+        "ralph-server-page.ts:77-96 reconstructs every visible event and replaces all event children after each changed response.",
+        "ralph-server-page.ts:56 and 97 restores focus only when the active element itself is a SUMMARY.",
+        "ralph-server-page.ts:33 and 82 preserves expansion state, but does not preserve text selection or focus within event content.",
+        "e2e/progress-server.test.ts:28-33 covers expanded-state and summary-focus preservation, but does not cover reading position or selection inside details."
+      ],
+      "acceptanceCriteria": [
+        "Appending a newer event retains the DOM identity and open state of unchanged visible events.",
+        "A text selection inside an expanded event remains intact after an append-only update.",
+        "An operator reading an older expanded event retains its viewport position when newer events arrive.",
+        "Keyboard focus on an existing event summary survives refresh, and newly appended events remain discoverable.",
+        "Run changes, search changes, and log replacement still produce the correct event list; host browser tests exercise append-only continuity with test-owned fixtures."
+      ],
+      "impact": 4,
+      "confidence": 4,
+      "effort": 3,
+      "risk": 3,
+      "mustDo": {
+        "productManager": {
+          "score": 4,
+          "rationale": "Reading evidence is a core viewer task. Automatic updates should support that task; repeatedly losing reading context could force operators to pause monitoring or re-find information."
+        },
+        "subjectMatterExpert": {
+          "score": 3,
+          "rationale": "Verification and repair details require sustained inspection. Stable reading context supports accurate understanding and keyboard use, although the existing pause control provides a workaround.",
+          "domain": "Developer workflow observability and accessible live log interfaces"
+        }
+      },
+      "index": 2,
+      "score": 1.7777777777777777,
+      "mustDoScore": 7
+    },
+    {
+      "title": "Make event dates visible in multi-day timelines",
+      "category": "Timeline orientation",
+      "rationale": "Add visible date context to event timestamps, using date groups or compact date labels while retaining local time and the exact timestamp. Scope this to chronology comprehension rather than adding new filtering. The expected benefit is avoiding confusion between events on different days; no measured confusion rate is available.",
+      "evidence": [
+        "ralph-server-page.ts:85 renders only hour, minute, and second in collapsed event rows.",
+        "ralph-server-page.ts:86 puts the full timestamp in a title attribute, while line 91 shows it inside expanded details.",
+        "ralph-server-page.ts:50 supports All runs, allowing historical events from multiple dates in one timeline.",
+        "e2e/progress-server.test.ts:23 creates events using the current timestamp and does not cover multi-day chronology."
+      ],
+      "acceptanceCriteria": [
+        "A timeline containing events from two dates visibly identifies both dates without hover or event expansion.",
+        "Date context remains correct after run filtering, searching, pagination, and live insertion.",
+        "Local date labels and local times use a consistent timezone interpretation, while exact recorded timestamps remain inspectable.",
+        "Invalid timestamps remain readable and do not prevent other events from rendering.",
+        "Host browser tests verify multi-day fixtures and narrow-screen readability."
+      ],
+      "impact": 3,
+      "confidence": 5,
+      "effort": 2,
+      "risk": 1,
+      "mustDo": {
+        "productManager": {
+          "score": 3,
+          "rationale": "Operators reviewing historical or long-running work need reliable temporal orientation. Time-only rows make otherwise supported history browsing unnecessarily ambiguous."
+        },
+        "subjectMatterExpert": {
+          "score": 3,
+          "rationale": "Dates are necessary context when correlating verification, interruption, and repair events across days. Visible chronology supports accurate reconstruction of what happened and when.",
+          "domain": "Developer workflow observability and diagnostic timeline interpretation"
+        }
+      },
+      "index": 4,
+      "score": 7.5,
+      "mustDoScore": 6
+    },
+    {
+      "title": "Show why an event matched a search",
+      "category": "Evidence discovery",
+      "rationale": "Provide a bounded text excerpt from the matching detail field when a search matches content hidden inside a collapsed event. Preserve the normal event preview when it already explains the match. This small slice helps operators locate decisions and failures without opening every result; reduced search effort remains a hypothesis.",
+      "evidence": [
+        "ralph-server-page.ts:73-74 searches the serialized entire entry, including nested details.",
+        "ralph-server-page.ts:44 and 88 chooses a preview from a fixed field priority independently of the search query.",
+        "ralph-server-page.ts:82 keeps matching events collapsed unless they were previously expanded.",
+        "e2e/progress-server.test.ts:43-44 checks search result count but does not assert that the matching evidence is visible."
+      ],
+      "acceptanceCriteria": [
+        "Searching for text present only in a nested detail value shows that matching text in a bounded excerpt on the collapsed result.",
+        "Case-insensitive search retains its current behavior, and clearing the query restores ordinary previews.",
+        "Search excerpts render HTML-like log content as inert text.",
+        "Multiple matches and long values produce readable excerpts without unbounded event summaries.",
+        "Host browser tests verify nested-detail matches, clearing search, and no-match recovery using test-owned fixtures."
+      ],
+      "impact": 3,
+      "confidence": 5,
+      "effort": 2,
+      "risk": 2,
+      "mustDo": {
+        "productManager": {
+          "score": 3,
+          "rationale": "Search promises access to commands and decisions, but a result whose visible content does not explain the match leaves the operator doing repeated manual inspection."
+        },
+        "subjectMatterExpert": {
+          "score": 3,
+          "rationale": "The connection between a query and its underlying evidence should be inspectable. Matching excerpts help operators understand nested verification and decision records without changing their meaning.",
+          "domain": "Developer workflow observability and diagnostic evidence retrieval"
+        }
+      },
+      "index": 3,
+      "score": 3.75,
+      "mustDoScore": 6
+    }
+  ]
+}
+
+[2026-10-19T14:37:11.347Z] 20261019143450543-bfef85b6 — Candidate selected
+{
+  "iteration": 1,
+  "candidate": {
+    "title": "Show stopped-run reasons and resume instructions above the timeline",
+    "category": "Recovery and run comprehension",
+    "rationale": "Give the selected run a concise stopped-state summary containing its recorded error, pending phase, and resume command. The product domain is developer workflow observability for autonomous coding. Learner needs here mean helping operators understand the workflow and its evidence; the repository does not establish an educational product. Faster recovery is a hypothesis, not a measured result. Scope this increment to presenting existing log data without executing commands.",
+    "evidence": [
+      "ralph-server-page.ts:62-72 displays the stopped phase and latest event, but omits the recorded error and resume instructions from the summary.",
+      "ralph-server-page.ts:44 does not include resume instructions in event previews; full recovery information requires expanding the stopped event.",
+      "ralph.ts:543 records error, pendingPhase, repairs, and resume in 'Run stopped; changes preserved'.",
+      "README.md:10-12 explains that failed checks, exhausted repairs, and interruptions stop runs with changes preserved for resuming. Findings are from source inspection; no browser checks were executed."
+    ],
+    "acceptanceCriteria": [
+      "Given a selected run ending with 'Run stopped; changes preserved', main content visibly presents its error, pending phase, and exact recorded resume command without expanding an event.",
+      "Switching runs updates the recovery summary without leaking another run's error or command.",
+      "A subsequent 'Run resumed' or 'Phase started' event clears the obsolete stopped summary.",
+      "Missing recovery fields are handled without undefined text, and log values render as inert text.",
+      "Host browser verification uses test-owned API fixtures for stopped, resumed, and multiple-run cases; the viewer never starts or resumes a run."
+    ],
+    "impact": 5,
+    "confidence": 5,
+    "effort": 2,
+    "risk": 2,
+    "mustDo": {
+      "productManager": {
+        "score": 4,
+        "rationale": "An interrupted operator needs to understand what prevented progress and how to continue. Hiding that information behind event expansion significantly impedes recovery from an explicitly supported workflow."
+      },
+      "subjectMatterExpert": {
+        "score": 4,
+        "rationale": "A monitoring surface should make recorded intervention requirements immediately understandable. Showing the recorded recovery instructions teaches the correct continuation path while avoiding unsupported claims about completion or automatic recovery.",
+        "domain": "Developer workflow observability and autonomous coding run recovery"
+      }
+    }
+  },
+  "mustDoScore": 8,
+  "score": 6.25,
+  "reason": "Highest score among candidates whose titles have not been completed, ranked by combined role must-do scores; ties use value/cost, higher impact, lower effort, then proposal order",
+  "excludedCompletedTitles": []
+}
+
+[2026-10-19T14:37:11.362Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 1,
+  "phase": "implement"
+}
+
+[2026-10-19T14:40:36.483Z] 20261019143450543-bfef85b6 — Implementation completed; verification required
+{
+  "summary": "Implemented the stopped-run recovery summary above Activity. It shows recorded errors, pending phase, and exact resume commands; updates when switching runs; clears after continuation; and handles missing fields safely. Seven render tests, lint, typecheck, build, and whitespace checks passed. Full-suite and browser verification remain with the host. Evidence and browser handoff: .ralph/20261019143450543-bfef85b6/evidence/recovery-verification.md; test results: recovery.tap in that directory.",
+  "decisions": [
+    {
+      "decision": "Present recovery details above the timeline.",
+      "reason": "Operators can read continuation instructions without expanding events."
+    },
+    {
+      "decision": "Keep recorded commands exact, selectable, and read-only.",
+      "reason": "This increment presents log data without executing commands."
+    },
+    {
+      "decision": "Derive recovery from the selected run’s latest lifecycle event.",
+      "reason": "Prevents cross-run leakage and clears obsolete instructions after continuation."
+    },
+    {
+      "decision": "Use explicit missing-field messages and textContent rendering.",
+      "reason": "Incomplete logs stay understandable and log values remain inert."
+    },
+    {
+      "decision": "Add isolated render tests and defer browser execution to the host.",
+      "reason": "Validates changed behavior within the phase’s server and browser restrictions."
+    }
+  ]
+}
+
+[2026-10-19T14:40:36.497Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 1,
+  "phase": "verify"
+}
+
+[2026-10-19T14:40:37.296Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 1,
+  "phase": "verify",
+  "command": "npm run lint",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/1-verify-1792420836497-13-lint.log"
+}
+
+[2026-10-19T14:40:38.821Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 1,
+  "phase": "verify",
+  "command": "npm run typecheck",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/1-verify-1792420837300-14-typecheck.log"
+}
+
+[2026-10-19T14:40:42.711Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 1,
+  "phase": "verify",
+  "command": "npm run test",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/1-verify-1792420838825-15-test.log"
+}
+
+[2026-10-19T14:40:44.299Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 1,
+  "phase": "verify",
+  "command": "npm run build",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/1-verify-1792420842715-16-build.log"
+}
+
+[2026-10-19T14:40:44.303Z] 20261019143450543-bfef85b6 — Verification decision
+{
+  "nextPhase": "browser-prepare",
+  "failures": []
+}
+
+[2026-10-19T14:40:44.315Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 1,
+  "phase": "browser-prepare"
+}
+
+[2026-10-19T14:42:01.883Z] 20261019143450543-bfef85b6 — Playwright coverage prepared
+{
+  "spec": "e2e/ralph/20261019143450543-bfef85b6/iteration-1.spec.ts",
+  "summary": "Created iteration-1.spec.ts with six browser tests. Playwright discovery passed; browser tests were not run.",
+  "decisions": [
+    {
+      "decision": "Check visible recovery fields, placement above Activity, and reload behavior.",
+      "reason": "Operators must see exact recorded instructions without expanding events."
+    },
+    {
+      "decision": "Cover run switching and live Run resumed/Phase started updates.",
+      "reason": "Recovery details must stay associated with the selected run and clear when obsolete."
+    },
+    {
+      "decision": "Cover missing fields and inert HTML-like values.",
+      "reason": "Incomplete logs must remain readable and safely rendered."
+    },
+    {
+      "decision": "Use test-owned API fixtures against the host-served viewer.",
+      "reason": "Validates presentation without changing user logs or executing runs."
+    }
+  ]
+}
+
+[2026-10-19T14:42:02.737Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 1,
+  "phase": "browser-prepare",
+  "command": "npm run lint",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/1-browser-prepare-1792420921883-21-lint.log"
+}
+
+[2026-10-19T14:42:04.523Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 1,
+  "phase": "browser-prepare",
+  "command": "npm run typecheck",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/1-browser-prepare-1792420922741-22-typecheck.log"
+}
+
+[2026-10-19T14:42:04.544Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 1,
+  "phase": "browser-run"
+}
+
+[2026-10-19T14:43:06.609Z] 20261019143450543-bfef85b6 — Host Playwright verification
+{
+  "status": "failed",
+  "passed": 0,
+  "reason": "0/6 browser tests passed without failures, skips, or retries; runner exited unsuccessfully",
+  "baseUrl": "http://localhost:3000",
+  "spec": "e2e/ralph/20261019143450543-bfef85b6/iteration-1.spec.ts",
+  "report": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/1-browser-run-1792420924591-23-playwright/results.json",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/1-browser-run-1792420924591-23-playwright/runner.log",
+  "artifacts": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/1-browser-run-1792420924591-23-playwright/artifacts"
+}
+
+[2026-10-19T14:43:06.622Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 1,
+  "phase": "repair"
+}
+
+[2026-10-19T14:43:06.623Z] 20261019143450543-bfef85b6 — Repair selected
+{
+  "iteration": 1,
+  "attempt": 1,
+  "maximum": 3,
+  "reasons": [
+    "Playwright acceptance test failed: 0/6 browser tests passed without failures, skips, or retries; runner exited unsuccessfully. Inspect /home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/1-browser-run-1792420924591-23-playwright/results.json and /home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/1-browser-run-1792420924591-23-playwright/runner.log."
+  ]
+}
+
+[2026-10-19T14:44:09.117Z] 20261019143450543-bfef85b6 — Repair completed; verification required
+{
+  "attempt": 1,
+  "summary": "Repaired the feature spec to load the production Ralph viewer; failures had reached an unrelated homepage. Lint, typecheck, build, and diff checks passed. Tests were blocked by sandbox IPC permissions (EPERM). Host browser rerun remains required. Evidence: .ralph/20261019143450543-bfef85b6/repair-evidence.md.",
+  "decisions": [
+    {
+      "decision": "Route the test document to the production progressPage export.",
+      "reason": "The configured host served Mastery Tutor instead of the Ralph viewer."
+    },
+    {
+      "decision": "Preserve the production content security policy in the fixture.",
+      "reason": "Keep inert-text verification representative of production restrictions."
+    },
+    {
+      "decision": "Retain all acceptance assertions, API fixtures, and timeouts; leave app code unchanged.",
+      "reason": "Recorded failures identified the wrong document, not a recovery behavior defect."
+    }
+  ]
+}
+
+[2026-10-19T14:44:09.131Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 1,
+  "phase": "verify"
+}
+
+[2026-10-19T14:44:09.989Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 1,
+  "phase": "verify",
+  "command": "npm run lint",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/1-verify-1792421049132-28-lint.log"
+}
+
+[2026-10-19T14:44:11.584Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 1,
+  "phase": "verify",
+  "command": "npm run typecheck",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/1-verify-1792421049993-29-typecheck.log"
+}
+
+[2026-10-19T14:44:15.858Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 1,
+  "phase": "verify",
+  "command": "npm run test",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/1-verify-1792421051588-30-test.log"
+}
+
+[2026-10-19T14:44:17.464Z] 20261019143450543-bfef85b6 — Check passed
+{
+  "iteration": 1,
+  "phase": "verify",
+  "command": "npm run build",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/1-verify-1792421055862-31-build.log"
+}
+
+[2026-10-19T14:44:17.468Z] 20261019143450543-bfef85b6 — Verification decision
+{
+  "nextPhase": "browser-run",
+  "failures": []
+}
+
+[2026-10-19T14:44:17.482Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 1,
+  "phase": "browser-run"
+}
+
+[2026-10-19T14:44:22.713Z] 20261019143450543-bfef85b6 — Host Playwright verification
+{
+  "status": "passed",
+  "passed": 6,
+  "reason": "All 6 browser tests passed",
+  "baseUrl": "http://localhost:3000",
+  "spec": "e2e/ralph/20261019143450543-bfef85b6/iteration-1.spec.ts",
+  "report": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/1-browser-run-1792421057508-32-playwright/results.json",
+  "log": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/1-browser-run-1792421057508-32-playwright/runner.log",
+  "artifacts": "/home/leopard/development/jovis.ai/ralph/.ralph/20261019143450543-bfef85b6/1-browser-run-1792421057508-32-playwright/artifacts"
+}
+
+[2026-10-19T14:44:22.727Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 1,
+  "phase": "review"
+}
+
+[2026-10-19T14:45:09.544Z] 20261019143450543-bfef85b6 — Independent review decision
+{
+  "summary": "Review passed. No unresolved defects found in the recovery summary or acceptance coverage.",
+  "acceptancePassed": true,
+  "acceptanceEvidence": [
+    "Browser tests verify error, pending phase, and recorded resume command above Activity with events collapsed, including after reload.",
+    "Run-switching tests verify isolated recovery details and newest-run behavior for All runs.",
+    "Separate live-update tests verify Run resumed and Phase started clear obsolete recovery details.",
+    "Missing-field and injection tests verify readable fallbacks and inert text; source uses textContent.",
+    "Tests use test-owned API fixtures and the production HTML export. Source adds no run execution actions."
+  ],
+  "userFacing": true,
+  "browserEvidence": [
+    "Inspected the supplied results.json: 6 passed, 0 skipped, 0 unexpected, 0 flaky, no retries.",
+    "Inspected the browser spec and artifacts directory; .last-run.json reports passed. No screenshots or traces were retained.",
+    "Inspected host logs confirming lint, typecheck, all 16 suite tests, and build passed. Review-time git diff --check also passed."
+  ],
+  "findings": [],
+  "nextPhase": "commit",
+  "unresolved": []
+}
+
+[2026-10-19T14:45:09.558Z] 20261019143450543-bfef85b6 — Phase started
+{
+  "iteration": 1,
+  "phase": "commit"
+}
+
+[2026-10-19T14:45:09.560Z] 20261019143450543-bfef85b6 — Verified iteration approved for commit
+{
+  "iteration": 1,
+  "candidate": "Show stopped-run reasons and resume instructions above the timeline",
+  "summary": "Implemented the stopped-run recovery summary above Activity. It shows recorded errors, pending phase, and exact resume commands; updates when switching runs; clears after continuation; and handles missing fields safely. Seven render tests, lint, typecheck, build, and whitespace checks passed. Full-suite and browser verification remain with the host. Evidence and browser handoff: .ralph/20261019143450543-bfef85b6/evidence/recovery-verification.md; test results: recovery.tap in that directory.\nRepair 1: Repaired the feature spec to load the production Ralph viewer; failures had reached an unrelated homepage. Lint, typecheck, build, and diff checks passed. Tests were blocked by sandbox IPC permissions (EPERM). Host browser rerun remains required. Evidence: .ralph/20261019143450543-bfef85b6/repair-evidence.md.",
+  "decision": "Generate five new candidates after this commit",
+  "commitMessage": "ralph: Show stopped-run reasons and resume instructions above the timeline\n\nRalph-Run: 20261019143450543-bfef85b6\nRalph-Iteration: 1"
+}

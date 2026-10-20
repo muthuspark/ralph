@@ -9,8 +9,10 @@ reviews the changes, and commits each verified iteration on a local branch.
 ![Ralph's goal-driven iteration loop](docs/ralph-flow.svg)
 
 Throughout the loop, Ralph appends decisions and results to `progress.txt` and
-saves logs and checkpoints in `.ralph/`. Failed baseline checks, exhausted repair
-attempts, or interruptions stop the run with changes preserved for resuming.
+saves logs and checkpoints in `.ralph/`. After ordinary repair attempts are
+exhausted, Ralph calls Codex for one recovery pass and resumes verification.
+Failed baseline checks, unsuccessful recovery, or interruptions stop the run
+with changes preserved for resuming.
 
 ## Install globally from npm
 
@@ -123,7 +125,7 @@ ralph --resume <run-id>
 The default limit is ten verified commits; `--iterations 0` runs without a limit.
 When browser verification is enabled, the app must remain available at `--base-url`
 (default `http://localhost:3000`).
-Ralph uses its bundled Playwright runner and configuration; the project does not
+Ralph uses the project's Playwright runner with its bundled configuration; the project does not
 need a `test:e2e:ralph` npm script or a `playwright.ralph.config.ts` file.
 Generated specs live under `e2e/ralph/<run-id>/` in the project.
 
@@ -152,6 +154,20 @@ ralph --resume <run-id> --retry-verification
 
 This accepts the current edits for full verification and preserves the repair
 count. `ralph --help` lists the remaining options.
+
+When `--max-fix-attempts` is reached (default 3), Ralph automatically calls Codex
+with the unresolved errors, selected acceptance criteria, previous repair summary,
+and the run directory containing review results, check logs, and reproduction
+evidence. Codex fixes the remaining issue and adds regression coverage, then Ralph
+reruns full verification and independent review before committing or continuing.
+This also works when resuming an older checkpoint stopped at the repair limit.
+
+Recovery requires the `codex` CLI even for Claude runs, keeps the configured
+sandbox permissions, and uses Codex's default model when the main agent is Claude.
+There is one recovery pass per iteration; its saved counter survives interruptions
+and resumes, and resets after a verified commit. If recovery cannot resolve the
+issue, Ralph preserves the changes and stops. After a manual fix, use
+`--retry-verification` to recheck the changes without resetting either counter.
 
 ## Library
 

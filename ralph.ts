@@ -39,12 +39,13 @@ const reviewSchema = z.object({
   userFacing: z.boolean(), browserEvidence: z.array(text), findings: z.array(text),
 }).strict();
 type Candidate = z.infer<typeof candidateSchema>;
-const phases = ["baseline", "discover", "implement", "verify", "browser-prepare", "browser-run", "review", "repair", "commit", "done"] as const;
+const phases = ["baseline", "discover", "implement", "verify", "browser-prepare", "browser-run", "review", "repair", "recover", "commit", "done"] as const;
 const stateSchema = z.object({
   version: z.literal(1), id: text, root: text, branch: text, head: text, fingerprint: text,
   goal: text, model: z.string(), agent: z.enum(["codex", "claude"]).default("codex"), iterations: z.number().int().nonnegative(),
   maxFixAttempts: z.number().int().nonnegative(), timeoutMinutes: z.number().positive(),
   completed: z.number().int().nonnegative(), phase: z.enum(phases), repairs: z.number().int().nonnegative(),
+  recoveryAttempts: z.number().int().nonnegative().default(0),
   candidate: candidateSchema.nullable(), feedback: z.array(z.string()),
   history: z.array(z.object({ title: text, summary: text, commit: text })),
   summary: z.string(), lastError: z.string(),
@@ -71,7 +72,7 @@ server                         Live browser view of progress.txt in the current 
 --iterations N                 Verified commits per run (default 10; 0 = unlimited)
 --model MODEL                  Override the selected CLI's model
 --agent AGENT                  Agent CLI: codex (default) or claude
---max-fix-attempts N            Repair rounds per iteration (default 3)
+--max-fix-attempts N            Repair rounds per iteration (default 3), then one Codex recovery
 --phase-timeout-minutes N       Timeout per agent/check command (default 30)
 --base-url URL                 Existing app server (default http://localhost:3000)
 --agent-sandbox MODE           phase-default (default) or explicit danger-full-access; Claude uses scoped tool permissions unless explicitly bypassed
@@ -311,7 +312,7 @@ export async function runRalph(options: Options, cwd = process.cwd(), signal?: A
         version: 1, id, root, branch: `ralph/${id}`, head: await git(root, "rev-parse", "HEAD"),
         fingerprint: "", goal, model: options.model ?? "", agent: options.agent ?? "codex", iterations: options.iterations,
         maxFixAttempts: options.maxFixAttempts, timeoutMinutes: options.timeoutMinutes,
-        completed: 0, phase: "baseline", repairs: 0, candidate: null, feedback: [], history: [], summary: "", lastError: "",
+        completed: 0, phase: "baseline", repairs: 0, recoveryAttempts: 0, candidate: null, feedback: [], history: [], summary: "", lastError: "",
         baseUrl: options.baseUrl ?? "http://localhost:3000", browserResult: null,
         agentSandbox: options.agentSandbox ?? "phase-default",
       };
@@ -337,26 +338,28 @@ export async function runRalph(options: Options, cwd = process.cwd(), signal?: A
         throw new Error("Agent or external process changed Git HEAD/branch; stopped without resetting files");
       }
     };
-    const agent = async <T>(schema: z.ZodType<T>, prompt: string, writable: boolean, wireSchema = schema) => {
+    const agent = async <T>(schema: z.ZodType<T>, prompt: string, writable: boolean, wireSchema = schema, selectedAgent: State["agent"] = s.agent) => {
       const schemaFile = artifact("schema.json"), output = artifact("result.json"), log = artifact("events.jsonl");
       await writeFile(schemaFile, JSON.stringify(z.toJSONSchema(wireSchema)));
       const input = `${instructions}\n\nPHASE: ${s.phase}\nTASK DATA (JSON):\n${JSON.stringify({
-        goal: s.goal, runDirectory: dir, completed: s.completed, history: s.history, candidate: s.candidate, feedback: s.feedback, baseUrl: s.baseUrl, browserSpec: browserSpec(), browserResult: s.browserResult, verification,
+        goal: s.goal, runDirectory: dir, completed: s.completed, history: s.history, candidate: s.candidate, feedback: s.feedback, repairs: s.repairs, recoveryAttempts: s.recoveryAttempts, baseUrl: s.baseUrl, browserSpec: browserSpec(), browserResult: s.browserResult, verification,
       })}\n\n${prompt}`;
       await writeFile(artifact("prompt.txt"), input);
       const before = await fingerprint(root);
       const sandbox = s.agentSandbox === "danger-full-access" ? "danger-full-access" : writable ? "workspace-write" : "read-only";
-      if (s.agent === "codex") {
-        await command(s.agent, ["--ask-for-approval", "never", "exec", "--ephemeral", "--sandbox", sandbox,
+      // A Claude model override is not a valid Codex recovery model.
+      const model = selectedAgent === s.agent ? s.model : "";
+      if (selectedAgent === "codex") {
+        await command(selectedAgent, ["--ask-for-approval", "never", "exec", "--ephemeral", "--sandbox", sandbox,
           "--cd", root, "--json", "--output-schema", schemaFile, "--output-last-message", output,
-          ...(s.model ? ["--model", s.model] : []), "-"], root, { input, log, timeoutMs, signal });
+          ...(model ? ["--model", model] : []), "-"], root, { input, log, timeoutMs, signal });
       } else {
         const args = ["--print", "--output-format", "json"];
         if (s.agentSandbox === "danger-full-access") args.push("--dangerously-skip-permissions");
         else if (writable) args.push("--permission-mode", "acceptEdits", "--allowedTools", "Bash");
         else args.push("--allowedTools", "Read", "Grep", "Glob");
-        if (s.model) args.push("--model", s.model);
-        const result = await command(s.agent, args, root, {
+        if (model) args.push("--model", model);
+        const result = await command(selectedAgent, args, root, {
           input: `${input}\n\nReturn only a JSON object matching this JSON Schema:\n${await readFile(schemaFile, "utf8")}`,
           log, timeoutMs, signal, captureStdout: true,
         });
@@ -507,7 +510,12 @@ export async function runRalph(options: Options, cwd = process.cwd(), signal?: A
           break;
         }
         case "repair": {
-          if (s.repairs >= s.maxFixAttempts) throw new Error(`Repair limit (${s.maxFixAttempts}) exhausted. ${s.feedback.join("\n")}`);
+          if (s.repairs >= s.maxFixAttempts) {
+            if (s.recoveryAttempts >= 1) throw new Error(`Repair limit (${s.maxFixAttempts}) and Codex recovery exhausted. ${s.feedback.join("\n")}`);
+            s.phase = "recover";
+            await record("Repair limit reached; Codex recovery required", { repairs: s.repairs, maximum: s.maxFixAttempts, reasons: s.feedback });
+            break;
+          }
           // Persist the attempt before invoking the agent so interruptions cannot create unbounded retries.
           s.repairs++;
           await record("Repair selected", { iteration: s.completed + 1, attempt: s.repairs, maximum: s.maxFixAttempts, reasons: s.feedback });
@@ -515,6 +523,26 @@ export async function runRalph(options: Options, cwd = process.cwd(), signal?: A
           const result = await agent(implementationSchema, "Fix the recorded check failures, review findings, or interrupted implementation. Stay within the selected increment. Fix app code or the feature Playwright spec as warranted without weakening tests. Do not launch a server or browser here; the host executes Playwright. Report what changed and evidence locations or blockers. List every repair decision and its reason for the progress log.", true);
           await record("Repair completed; verification required", { attempt: s.repairs, ...result });
           s.summary += `\nRepair ${s.repairs}: ${result.summary}`;
+          s.phase = "verify";
+          break;
+        }
+        case "recover": {
+          if (s.recoveryAttempts >= 1) {
+            // A saved in-flight attempt may survive an abrupt orchestrator exit.
+            s.browserResult = null;
+            s.phase = "verify";
+            await record("Saved Codex recovery attempt found; verification resuming", { attempt: s.recoveryAttempts });
+            break;
+          }
+          await command("codex", ["--version"], root, { signal });
+          // Save before invocation so restarting cannot silently grant unlimited recoveries.
+          s.recoveryAttempts++;
+          await record("Codex recovery selected", { iteration: s.completed + 1, attempt: s.recoveryAttempts, repairs: s.repairs, reasons: s.feedback, runDirectory: dir });
+          await save();
+          const result = await agent(implementationSchema, `The ordinary repair limit (${s.maxFixAttempts}) was exhausted. Diagnose and fix the unresolved errors in feedback, including any missing acceptance evidence. Inspect the latest review and repair result files, check logs, and reproduction evidence under runDirectory before editing. Address the underlying cause and related paths, and add regression coverage that reproduces the reported defect, including error states and boundary sizes when relevant. Preserve the selected increment and existing work. Do not weaken checks or acceptance criteria, reset counters, edit Ralph state, or launch another Ralph process. Report fixes, actual test results, and evidence locations. The host will automatically resume full verification and independent review after this recovery. Previous implementation report: ${JSON.stringify(s.summary)}`, true, implementationSchema, "codex");
+          await record("Codex recovery completed; verification resuming", { attempt: s.recoveryAttempts, ...result });
+          s.summary += `\nCodex recovery: ${result.summary}`;
+          s.browserResult = null;
           s.phase = "verify";
           break;
         }
@@ -536,6 +564,10 @@ export async function runRalph(options: Options, cwd = process.cwd(), signal?: A
         state.phase = "repair";
         state.feedback.push("Implementation was interrupted or failed; inspect existing changes and finish it.");
       }
+      if (state.phase === "recover" && state.recoveryAttempts > 0) {
+        state.phase = "verify";
+        state.feedback.push("Codex recovery was interrupted or failed; verify preserved edits before continuing.");
+      }
       if (state.phase === "commit" && await git(root, "rev-parse", "HEAD") === state.head) {
         state.phase = "verify"; // A failed commit hook may have changed source files.
       }
@@ -551,6 +583,7 @@ function commitMessage(s: State) { return `ralph: ${s.candidate?.title}\n\nRalph
 function finishCommit(s: State, head: string) {
   s.history.push({ title: s.candidate!.title, summary: s.summary, commit: head });
   s.head = head; s.completed++; s.candidate = null; s.feedback = []; s.repairs = 0;
+  s.recoveryAttempts = 0;
   s.browserResult = null;
   s.phase = s.iterations !== 0 && s.completed >= s.iterations ? "done" : "discover";
 }
